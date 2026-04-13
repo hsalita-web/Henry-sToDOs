@@ -59,9 +59,9 @@ const ctx = canvas.getContext('2d');
 function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
 window.addEventListener('resize', resize); resize();
 
-const WORLD_SIZE = 5000; // Even bigger map
-const FOOD_COUNT = 500; // Spread thinner
-const BOT_COUNT = 22;
+const WORLD_SIZE = 5000; 
+const FOOD_COUNT = 500; 
+const BOT_COUNT = 15; // Reduced bot count
 const FUNNY_NAMES = ["Bark_Twain", "Oscar_Mayer", "Frank_Furter", "Sausage_Slayer", "Glizzy_God", "Mustard_Mane", "Wiener_Winner", "Link_Lover", "Bun_Burner", "Sub_Woofer"];
 
 let player, bots=[], foods=[], gameActive = false, kills = 0, mouseAngle = 0;
@@ -100,17 +100,18 @@ class Dog {
             let avoidX = 0, avoidY = 0, danger = false;
             let distToPlayer = Math.hypot(this.x - player.x, this.y - player.y);
 
-            // Improved AI: Better avoidance but still aggressive
-            let senseDist = 200; 
+            // "Dumbed down" avoidance: Bots wait longer to react
+            let senseDist = 160; 
             for(let d of allDogs) {
                 if (d === this) continue;
-                for(let i=0; i<d.segments.length; i+=10) {
+                // Only check head/neck area for avoidance to make them easier to trap
+                for(let i=0; i<Math.min(d.segments.length, 30); i+=10) {
                     let s = d.segments[i];
                     let dx = this.x - s.x;
                     let dy = this.y - s.y;
                     let distSq = dx*dx + dy*dy;
                     if (distSq < senseDist * senseDist) {
-                        avoidX += dx * 2; avoidY += dy * 2;
+                        avoidX += dx; avoidY += dy;
                         danger = true;
                     }
                 }
@@ -121,22 +122,24 @@ class Dog {
                 let diff = escapeAngle - this.angle;
                 while (diff < -Math.PI) diff += Math.PI * 2;
                 while (diff > Math.PI) diff -= Math.PI * 2;
-                this.angle += diff * 0.12; // Snappier avoidance
-            } else if (distToPlayer < 600) {
-                let targetX = player.x + Math.cos(player.angle) * 120;
-                let targetY = player.y + Math.sin(player.angle) * 120;
+                this.angle += diff * 0.08; // Slower turn rate = easier to kill
+            } else if (distToPlayer < 500) {
+                // Slightly sloppy attacking
+                let targetX = player.x + (Math.random() - 0.5) * 50; 
+                let targetY = player.y + (Math.random() - 0.5) * 50;
                 let attackAngle = Math.atan2(targetY - this.y, targetX - this.x);
                 let diff = attackAngle - this.angle;
                 while (diff < -Math.PI) diff += Math.PI * 2;
                 while (diff > Math.PI) diff -= Math.PI * 2;
-                this.angle += diff * 0.06;
+                this.angle += diff * 0.04; 
             } else {
-                this.angle += (Math.random() - 0.5) * 0.1;
+                this.angle += (Math.random() - 0.5) * 0.08;
             }
 
             const margin = 120;
-            if(this.x < margin) this.angle = 0; else if(this.x > WORLD_SIZE-margin) this.angle = Math.PI;
-            if(this.y < margin) this.angle = Math.PI/2; else if(this.y > WORLD_SIZE-margin) this.angle = -Math.PI/2;
+            if(this.x < margin || this.x > WORLD_SIZE-margin || this.y < margin || this.y > WORLD_SIZE-margin) {
+                this.angle += 0.15;
+            }
         }
 
         if (this.isBoosting) {
@@ -166,10 +169,10 @@ class Dog {
         ctx.translate(hx, hy);
         ctx.rotate(this.angle);
         
-        // Collar (Just behind the head)
-        ctx.fillStyle = "#ff4444"; // Red collar
+        // Red Collar
+        ctx.fillStyle = "#ff4444"; 
         ctx.fillRect(-w*0.2, -w*0.5, w*0.3, w);
-        ctx.fillStyle = "#ffd700"; // Gold tag
+        ctx.fillStyle = "#ffd700"; 
         ctx.beginPath(); ctx.arc(0, w*0.4, w*0.15, 0, Math.PI*2); ctx.fill();
 
         ctx.fillStyle = this.color;
@@ -199,7 +202,7 @@ class Food {
     constructor(x, y, size=4, val=2, drop=false) {
         this.x=x; this.y=y; this.size=size; this.val=val; this.drop=drop;
         this.color = drop ? "#ffcc00" : `hsl(${Math.random()*360},80%,70%)`;
-        this.life = 600; // Dropped food eventually fades
+        this.life = 600; 
     }
     draw(camera) {
         ctx.fillStyle = this.color;
@@ -213,7 +216,10 @@ for(let i=0; i<BOT_COUNT; i++) spawnBot();
 
 function spawnBot() {
     let colors = ['#e67e22', '#e74c3c', '#9b59b6', '#3498db', '#2ecc71', '#f1c40f'];
-    let randSize = 40 + Math.random() * 1000;
+    // 75% Regular Size (40-100), 25% Large (up to 1200)
+    let isLarge = Math.random() > 0.75;
+    let randSize = isLarge ? (400 + Math.random() * 800) : (40 + Math.random() * 60);
+    
     bots.push(new Dog(Math.random()*WORLD_SIZE, Math.random()*WORLD_SIZE, colors[Math.floor(Math.random()*colors.length)], FUNNY_NAMES[Math.floor(Math.random()*FUNNY_NAMES.length)], false, randSize));
 }
 
