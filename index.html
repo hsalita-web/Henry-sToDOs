@@ -43,7 +43,7 @@ class Dog {
     this.segments = [];
     this.length = 40;
     this.angle = Math.random() * Math.PI * 2;
-    this.baseSpeed = 1.8; 
+    this.baseSpeed = 1.5; // Slower, more tactical pace
     this.color = color;
     this.name = name;
     this.isPlayer = isPlayer;
@@ -59,27 +59,32 @@ class Dog {
     if (this.isPlayer) {
       this.angle = mouseAngle;
       if (playerBoosting && this.length > 20) {
-        speed = 4.5;
+        speed = 3.8; 
         this.isBoosting = true;
       }
     } else {
-      // --- REFINED BOT AI ---
+      // --- ATTACK-PRIMARY BOT AI ---
       let target = null;
-      let minDist = 800;
+      let minDist = 900;
       let avoidanceX = 0;
       let avoidanceY = 0;
       let inDanger = false;
 
-      // 1. Avoidance: Only look at OTHER dogs
-      for (let other of allDogs) {
-        if (other === this) continue; // DO NOT avoid self
+      // 1. Predatory: Look for targets first
+      allDogs.forEach(d => {
+        if (d !== this) {
+          let dist = Math.hypot(this.x - d.x, this.y - d.y);
+          if (dist < minDist) { minDist = dist; target = d; }
+        }
+      });
 
-        for (let i = 0; i < other.segments.length; i += 2) {
+      // 2. Avoidance: Smaller danger zone (45px) makes them easier to trap
+      for (let other of allDogs) {
+        if (other === this) continue;
+        for (let i = 0; i < other.segments.length; i += 3) {
           let seg = other.segments[i];
           let dist = Math.hypot(this.x - seg.x, this.y - seg.y);
-          
-          if (dist < 70) { 
-            // Calculate a vector pointing AWAY from the obstacle
+          if (dist < 45) { 
             avoidanceX += (this.x - seg.x) / dist;
             avoidanceY += (this.y - seg.y) / dist;
             inDanger = true;
@@ -88,42 +93,34 @@ class Dog {
       }
 
       if (inDanger) {
-        // Steer toward the avoidance vector
         let avoidAngle = Math.atan2(avoidanceY, avoidanceX);
         let diff = avoidAngle - this.angle;
         while (diff < -Math.PI) diff += Math.PI * 2;
         while (diff > Math.PI) diff -= Math.PI * 2;
-        this.angle += diff * 0.15; // Smooth turning
-      } else {
-        // 2. Predatory: If safe, hunt the closest player
-        allDogs.forEach(d => {
-          if (d !== this) {
-            let dist = Math.hypot(this.x - d.x, this.y - d.y);
-            if (dist < minDist) { minDist = dist; target = d; }
-          }
-        });
+        this.angle += diff * 0.08; // Slower reactions = more killable
+      } 
+      
+      // Pursue target if no immediate body-collision danger
+      if (target) {
+        let targetAngle = Math.atan2(target.y - this.y, target.x - this.x);
+        let diff = targetAngle - this.angle;
+        while (diff < -Math.PI) diff += Math.PI * 2;
+        while (diff > Math.PI) diff -= Math.PI * 2;
+        this.angle += diff * 0.1; // Aggressive tracking/cutting off
 
-        if (target) {
-          let targetAngle = Math.atan2(target.y - this.y, target.x - this.x);
-          let diff = targetAngle - this.angle;
-          while (diff < -Math.PI) diff += Math.PI * 2;
-          while (diff > Math.PI) diff -= Math.PI * 2;
-          this.angle += diff * 0.07; 
-
-          if (minDist < 250 && this.length > 35) {
-            speed = 4;
-            this.isBoosting = true;
-          }
-        } else {
-          this.angle += (Math.random()-0.5)*0.05;
+        if (minDist < 300 && this.length > 30) {
+          speed = 3.5;
+          this.isBoosting = true;
         }
+      } else if (!inDanger) {
+        this.angle += (Math.random()-0.5)*0.05;
       }
     }
 
-    // Boosting Mechanics
+    // Boosting Mechanics: Drop small treats while speeding
     if (this.isBoosting) {
-      this.length -= 0.12;
-      if (Math.random() > 0.7) {
+      this.length -= 0.1;
+      if (Math.random() > 0.75) {
         let lastSeg = this.segments[this.segments.length - 1] || this;
         foods.push(new Food(lastSeg.x, lastSeg.y, 3, 0.7, true));
       }
@@ -162,7 +159,7 @@ class Dog {
     ctx.translate(hx, hy);
     ctx.rotate(this.angle);
     ctx.fillStyle = this.color;
-    // Snout
+    // The "Long" Wiener Snout
     ctx.beginPath(); ctx.ellipse(w*0.7, 0, w*0.8, w*0.5, 0, 0, Math.PI*2); ctx.fill();
     // Nose
     ctx.fillStyle = "black";
@@ -171,7 +168,7 @@ class Dog {
     ctx.fillStyle = "white";
     ctx.beginPath(); ctx.arc(2, -w/3, 2.5, 0, Math.PI*2); ctx.fill();
     ctx.beginPath(); ctx.arc(2, w/3, 2.5, 0, Math.PI*2); ctx.fill();
-    // Ears
+    // Floppy Ears
     ctx.fillStyle = "rgba(0,0,0,0.2)";
     ctx.beginPath(); ctx.ellipse(0, -w/1.5, w*0.6, w/3, Math.PI/4, 0, Math.PI*2); ctx.fill();
     ctx.beginPath(); ctx.ellipse(0, w/1.5, w*0.6, w/3, -Math.PI/4, 0, Math.PI*2); ctx.fill();
@@ -231,10 +228,12 @@ function dropFood(dog){
 }
 
 function checkDeath(dog, others){
+  // Fence collision
   if(dog.x < 0 || dog.x > WORLD_SIZE || dog.y < 0 || dog.y > WORLD_SIZE) return true;
+  // Dog collision
   for(let other of others){
     for(let i=0; i<other.segments.length; i++){
-      if(other === dog && i < 12) continue; // Collision tolerance for own head
+      if(other === dog && i < 12) continue; // Head safety buffer
       if(Math.hypot(dog.x-other.segments[i].x, dog.y-other.segments[i].y) < other.width()/2 + 2) return true;
     }
   }
@@ -245,12 +244,12 @@ function gameLoop(){
   ctx.clearRect(0,0,canvas.width,canvas.height);
   let camera={x:player.x-canvas.width/2,y:player.y-canvas.height/2};
 
-  // Border
+  // Border Fence
   ctx.strokeStyle='red';
   ctx.lineWidth = 10;
   ctx.strokeRect(-camera.x,-camera.y,WORLD_SIZE,WORLD_SIZE);
 
-  // Expire drops
+  // Manage expiring food drops
   let now = Date.now();
   foods = foods.filter(f => !f.isDrop || (now - f.spawnTime < DROP_EXPIRY_MS));
 
@@ -263,7 +262,7 @@ function gameLoop(){
   bots.forEach(bot=>{ bot.update(allDogs); eat(bot); });
 
   if(checkDeath(player, bots)){
-    alert("Game Over! Final Length: " + Math.floor(player.length));
+    alert("Dog down! Final Score: " + Math.floor(player.length));
     location.reload();
     return;
   }
