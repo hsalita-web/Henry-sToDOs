@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Weekly To-Do + Wiener Progress</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f4f4;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+    }
+
+    h1 {
+      margin-bottom: 10px;
+    }
+
+    .container {
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+      width: 350px;
+    }
+
+    input {
+      width: 70%;
+      padding: 8px;
+    }
+
+    button {
+      padding: 8px;
+      margin-left: 5px;
+      cursor: pointer;
+    }
+
+    ul {
+      list-style: none;
+      padding: 0;
+      margin-top: 15px;
+    }
+
+    li {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      background: #eee;
+      padding: 8px;
+      border-radius: 5px;
+    }
+
+    .dog-container {
+      margin-top: 30px;
+      text-align: center;
+    }
+
+    .dog {
+      height: 40px;
+      background: brown;
+      border-radius: 20px;
+      position: relative;
+      transition: width 0.5s ease;
+    }
+
+    .dog::before {
+      content: '';
+      position: absolute;
+      left: -25px;
+      top: 5px;
+      width: 30px;
+      height: 30px;
+      background: brown;
+      border-radius: 50%;
+    }
+
+    .dog::after {
+      content: '';
+      position: absolute;
+      right: -10px;
+      top: 15px;
+      width: 10px;
+      height: 10px;
+      background: brown;
+      border-radius: 50%;
+    }
+
+    .percentage {
+      margin-top: 10px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Weekly To-Do</h1>
+
+  <div class="container">
+    <input type="text" id="taskInput" placeholder="Add a task...">
+    <button onclick="addTask()">Add</button>
+
+    <ul id="taskList"></ul>
+  </div>
+
+  <div class="dog-container">
+    <div id="dog" class="dog" style="width: 20px;"></div>
+    <div id="percentage" class="percentage">0% Complete</div>
+  </div>
+
+  <script>
+    const taskList = document.getElementById('taskList');
+    const dog = document.getElementById('dog');
+    const percentageText = document.getElementById('percentage');
+
+    function addTask() {
+      const input = document.getElementById('taskInput');
+      const taskText = input.value.trim();
+
+      if (taskText === '') return;
+
+      const li = document.createElement('li');
+
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.onchange = updateProgress;
+
+      const span = document.createElement('span');
+      span.textContent = taskText;
+
+      const deleteBtn = document.createElement('button');
+      deleteBtn.textContent = 'X';
+      deleteBtn.onclick = () => {
+        li.remove();
+        updateProgress();
+      };
+
+      li.appendChild(checkbox);
+      li.appendChild(span);
+      li.appendChild(deleteBtn);
+
+      taskList.appendChild(li);
+
+      input.value = '';
+
+      updateProgress();
+    }
+
+    function updateProgress() {
+      const tasks = taskList.querySelectorAll('li');
+      const total = tasks.length;
+
+      if (total === 0) {
+        dog.style.width = '20px';
+        percentageText.textContent = '0% Complete';
+        return;
+      }
+
+      let completed = 0;
+
+      tasks.forEach(task => {
+        if (task.querySelector('input').checked) {
+          completed++;
+        }
+      });
+
+      const percent = Math.round((completed / total) * 100);
+
+      // Dog grows from 20px to 300px
+      const width = 20 + (percent / 100) * 280;
+      dog.style.width = width + 'px';
+
+      percentageText.textContent = percent + '% Complete';
+    }
+  </script>
+
+</body>
+</html>
