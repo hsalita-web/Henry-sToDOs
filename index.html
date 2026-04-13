@@ -16,37 +16,37 @@
         .ui-card {
             background: rgba(255, 255, 255, 0.1);
             backdrop-filter: blur(15px);
-            padding: 40px;
+            padding: 30px;
             border-radius: 24px;
             border: 1px solid rgba(255,255,255,0.2);
             text-align: center;
             box-shadow: 0 20px 50px rgba(0,0,0,0.6);
-            min-width: 320px;
+            min-width: 340px;
         }
 
-        h1 { margin-top: 0; color: #ffcc00; font-size: 48px; text-shadow: 3px 3px 0px #8B4513; margin-bottom: 10px; }
+        h1 { margin-top: 0; color: #ffcc00; font-size: 42px; text-shadow: 3px 3px 0px #8B4513; margin-bottom: 10px; }
         
-        .input-group { margin: 20px 0; text-align: left; }
-        label { display: block; margin-bottom: 8px; font-size: 14px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; opacity: 0.7; }
+        .input-group { margin: 15px 0; text-align: left; }
+        label { display: block; margin-bottom: 5px; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; opacity: 0.7; }
         
-        input[type="text"] {
-            width: 100%; padding: 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.3); 
+        input[type="text"], select {
+            width: 100%; padding: 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.3); 
             background: rgba(0,0,0,0.3); color: white; font-size: 16px; box-sizing: border-box; outline: none;
         }
 
         input[type="color"] {
-            width: 100%; height: 45px; border: none; border-radius: 10px; background: none; cursor: pointer;
+            width: 100%; height: 40px; border: none; border-radius: 10px; background: none; cursor: pointer;
         }
 
         button {
-            width: 100%; padding: 18px; border-radius: 10px; border: none;
+            width: 100%; padding: 16px; border-radius: 10px; border: none;
             background: #ffcc00; color: #0f172a; font-weight: 800; font-size: 18px;
-            cursor: pointer; transition: all 0.2s; margin-top: 15px;
+            cursor: pointer; transition: all 0.2s; margin-top: 10px;
         }
-        button:hover { background: #ffe066; transform: translateY(-2px); box-shadow: 0 5px 15px rgba(255,204,0,0.3); }
+        button:hover { background: #ffe066; transform: translateY(-2px); }
 
-        #stats-summary { display: none; margin-bottom: 25px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 20px; }
-        .stat-val { font-size: 28px; color: #ffcc00; font-weight: bold; }
+        #stats-summary { display: none; margin-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 15px; }
+        .stat-val { font-size: 24px; color: #ffcc00; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -55,17 +55,25 @@
     <div class="ui-card">
         <div id="stats-summary">
             <h2 style="margin:0; color:#ff4444;">Wieners Wasted!</h2>
-            <p>Kills: <span id="final-kills" class="stat-val">0</span></p>
-            <p>Max Length: <span id="final-score" class="stat-val">0</span></p>
+            <p>Kills: <span id="final-kills" class="stat-val">0</span> | Max Length: <span id="final-score" class="stat-val">0</span></p>
         </div>
         
         <h1>Wiener.io</h1>
         
         <div class="input-group">
             <label>Dachshund Name</label>
-            <input type="text" id="name" placeholder="Name your hound..." value="LongBoi">
+            <input type="text" id="name" value="LongBoi">
         </div>
         
+        <div class="input-group">
+            <label>Difficulty</label>
+            <select id="difficulty">
+                <option value="easy">Easy (Puptastic)</option>
+                <option value="hard" selected>Hard (Hot Dog)</option>
+                <option value="difficult">Difficult (Alpha Hound)</option>
+            </select>
+        </div>
+
         <div class="input-group">
             <label>Coat Color</label>
             <input type="color" id="color" value="#8B4513">
@@ -93,9 +101,12 @@ const FOOD_COUNT = 500;
 const BOT_COUNT = 18;
 const DROP_EXPIRY_MS = 15000; 
 
+const FUNNY_NAMES = ["SnoopDog", "OscarMayer", "Frankfurter", "MustardBoi", "GlizzyGlad", "ShortLegs", "TheRelish", "WienerWhirl", "Noodle", "LongShot", "BunsOfSteel", "KetchupKing"];
+
 let player, bots=[], foods=[], gameActive = false;
 let kills = 0;
 let mouseAngle = 0;
+let currentDifficulty = 'hard';
 
 document.addEventListener('mousemove', e => {
     mouseAngle = Math.atan2(e.clientY - canvas.height/2, e.clientX - canvas.width/2);
@@ -111,19 +122,28 @@ class Dog {
         this.segments = [];
         this.length = 35;
         this.angle = Math.random() * Math.PI * 2;
-        this.baseSpeed = 2.2; 
         this.color = color;
         this.name = name;
         this.isPlayer = isPlayer;
         this.isBoosting = false;
-        // Initialize with a few segments to prevent instant death
+        
+        // Difficulty settings
+        this.speedMult = 1;
+        this.turnSpeed = 0.1;
+        
         for(let i=0; i<5; i++) this.segments.push({x:x, y:y});
     }
 
     width() { return 10 + this.length * 0.015; }
 
     update(allDogs) {
-        let speed = this.baseSpeed;
+        let baseSpeed = 2.2;
+        if (!this.isPlayer) {
+            if (currentDifficulty === 'easy') baseSpeed = 1.5;
+            if (currentDifficulty === 'difficult') baseSpeed = 2.8;
+        }
+
+        let speed = baseSpeed;
         this.isBoosting = false;
 
         if (this.isPlayer) {
@@ -133,30 +153,39 @@ class Dog {
                 this.isBoosting = true;
             }
         } else {
-            // Simple Bot AI: Avoid others and stay in bounds
+            // BOT AI
             let avoidX = 0, avoidY = 0, danger = false;
             
-            // Stay away from walls
-            if(this.x < 100) avoidX += 1; if(this.x > WORLD_SIZE-100) avoidX -= 1;
-            if(this.y < 100) avoidY += 1; if(this.y > WORLD_SIZE-100) avoidY -= 1;
+            // 1. AVOID BORDERS (High Priority)
+            const margin = 200;
+            if(this.x < margin) avoidX += 2; else if(this.x > WORLD_SIZE-margin) avoidX -= 2;
+            if(this.y < margin) avoidY += 2; else if(this.y > WORLD_SIZE-margin) avoidY -= 2;
 
+            // 2. AVOID OTHERS
+            let reactionDist = currentDifficulty === 'easy' ? 80 : (currentDifficulty === 'hard' ? 160 : 250);
             allDogs.forEach(d => {
                 if (d === this) return;
                 let dist = Math.hypot(this.x - d.x, this.y - d.y);
-                if (dist < 150) {
+                if (dist < reactionDist) {
                     avoidX += (this.x - d.x) / dist;
                     avoidY += (this.y - d.y) / dist;
                     danger = true;
                 }
             });
 
-            if (danger || avoidX !== 0) {
+            if (danger || avoidX !== 0 || avoidY !== 0) {
                 let targetAngle = Math.atan2(avoidY, avoidX);
                 let diff = targetAngle - this.angle;
                 while (diff < -Math.PI) diff += Math.PI * 2;
                 while (diff > Math.PI) diff -= Math.PI * 2;
-                this.angle += diff * 0.1;
-                if(danger && this.length > 30) { speed = 4; this.isBoosting = true; }
+                
+                let lerp = currentDifficulty === 'easy' ? 0.05 : 0.15;
+                this.angle += diff * lerp;
+                
+                if(danger && this.length > 30 && currentDifficulty !== 'easy') { 
+                    speed = baseSpeed * 1.8; 
+                    this.isBoosting = true; 
+                }
             } else {
                 this.angle += (Math.random() - 0.5) * 0.1;
             }
@@ -190,7 +219,6 @@ class Dog {
         }
         ctx.stroke();
 
-        // Draw Head Features
         let h = this.segments[0];
         let hx = h.x - camera.x;
         let hy = h.y - camera.y;
@@ -202,23 +230,29 @@ class Dog {
         // Snout
         ctx.fillStyle = this.color;
         ctx.beginPath(); ctx.ellipse(w*0.6, 0, w*0.8, w*0.5, 0, 0, Math.PI*2); ctx.fill();
+        
+        // Ears (Floppy)
+        ctx.beginPath(); ctx.ellipse(0, -w*0.6, w*0.5, w*0.3, Math.PI/4, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.ellipse(0, w*0.6, w*0.5, w*0.3, -Math.PI/4, 0, Math.PI*2); ctx.fill();
+
         // Nose
         ctx.fillStyle = "#000";
         ctx.beginPath(); ctx.arc(w*1.3, 0, w*0.15, 0, Math.PI*2); ctx.fill();
-        // Eyes
+        
+        // Eyes (Fixed Pupil size)
         ctx.fillStyle = "white";
         ctx.beginPath(); ctx.arc(w*0.3, -w*0.3, w*0.2, 0, Math.PI*2); ctx.fill();
         ctx.beginPath(); ctx.arc(w*0.3, w*0.3, w*0.2, 0, Math.PI*2); ctx.fill();
         ctx.fillStyle = "black";
-        ctx.beginPath(); ctx.arc(w*0.35, -w*0.3, w*0.1, 0, Math.PI*2); ctx.fill();
-        ctx.beginPath(); ctx.arc(w*0.35, w*0.3, w*0.1, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(w*0.35, -w*0.3, 2.5, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(w*0.35, w*0.3, 2.5, 0, Math.PI*2); ctx.fill();
         
         ctx.restore();
 
         ctx.fillStyle = "white";
         ctx.font = "bold 12px sans-serif";
         ctx.textAlign = "center";
-        ctx.fillText(this.name, hx, hy - w);
+        ctx.fillText(this.name, hx, hy - w - 5);
     }
 }
 
@@ -236,7 +270,6 @@ class Food {
     }
 }
 
-// Initial state
 player = new Dog(WORLD_SIZE/2, WORLD_SIZE/2, "#8B4513", "...", false);
 for(let i=0; i<FOOD_COUNT; i++) spawnFood();
 for(let i=0; i<BOT_COUNT; i++) spawnBot();
@@ -247,16 +280,18 @@ function spawnFood() {
 
 function spawnBot() {
     let colors = ['#e67e22', '#e74c3c', '#9b59b6', '#3498db', '#2ecc71', '#f1c40f'];
+    let name = FUNNY_NAMES[Math.floor(Math.random()*FUNNY_NAMES.length)];
     bots.push(new Dog(
         Math.random()*WORLD_SIZE, 
         Math.random()*WORLD_SIZE, 
         colors[Math.floor(Math.random()*colors.length)], 
-        "Bot " + Math.floor(Math.random()*99)
+        name
     ));
 }
 
 function startGame() {
     kills = 0;
+    currentDifficulty = document.getElementById('difficulty').value;
     player = new Dog(WORLD_SIZE/2, WORLD_SIZE/2, document.getElementById('color').value, document.getElementById('name').value, true);
     document.getElementById('overlay').style.display = 'none';
     gameActive = true;
@@ -264,13 +299,10 @@ function startGame() {
 
 function update() {
     let allDogs = [player, ...bots];
-    
     player.update(allDogs);
     bots.forEach(b => b.update(allDogs));
 
-    // Collision & Eating
     [player, ...bots].forEach(dog => {
-        // Eat Food
         for (let i = foods.length - 1; i >= 0; i--) {
             let f = foods[i];
             if (Math.hypot(dog.x - f.x, dog.y - f.y) < dog.width() + 5) {
@@ -282,15 +314,13 @@ function update() {
     });
 
     if (gameActive) {
-        // Player Death
         if (player.x < 0 || player.x > WORLD_SIZE || player.y < 0 || player.y > WORLD_SIZE || checkCollision(player, bots)) {
             gameOver();
         }
 
-        // Bot Death
         for (let i = bots.length - 1; i >= 0; i--) {
             if (bots[i].x < 0 || bots[i].x > WORLD_SIZE || bots[i].y < 0 || bots[i].y > WORLD_SIZE || checkCollision(bots[i], [player, ...bots.filter((_, idx) => idx !== i)])) {
-                if (Math.hypot(bots[i].x - player.x, bots[i].y - player.y) < 500) kills++; // Close enough count as player kill for simplicity
+                if (Math.hypot(bots[i].x - player.x, bots[i].y - player.y) < 200) kills++;
                 explodeToFood(bots[i]);
                 bots.splice(i, 1);
                 spawnBot();
@@ -302,7 +332,7 @@ function update() {
 function checkCollision(dog, others) {
     for (let other of others) {
         for (let i = 0; i < other.segments.length; i++) {
-            if (i < 5 && other === dog) continue; 
+            if (i < 8 && other === dog) continue; 
             let seg = other.segments[i];
             if (Math.hypot(dog.x - seg.x, dog.y - seg.y) < (other.width()/2 + 2)) return true;
         }
@@ -331,63 +361,45 @@ function draw() {
     let camera = { x: player.x - canvas.width/2, y: player.y - canvas.height/2 };
 
     // World Border
-    ctx.strokeStyle = '#1e293b';
-    ctx.lineWidth = 20;
+    ctx.strokeStyle = '#334155';
+    ctx.lineWidth = 15;
     ctx.strokeRect(-camera.x, -camera.y, WORLD_SIZE, WORLD_SIZE);
 
-    // Food
     foods.forEach(f => f.draw(camera));
-
-    // Dogs
     bots.forEach(b => b.draw(camera));
     if (gameActive) player.draw(camera);
 
-    // UI
     if (gameActive) {
-        // Length
+        // UI
         ctx.fillStyle = "white";
         ctx.font = "bold 20px sans-serif";
-        ctx.textAlign = "left";
         ctx.fillText(`Length: ${Math.floor(player.length)}`, 30, canvas.height - 30);
 
         // Minimap
-        const mSize = 160;
-        const mPadding = 20;
-        const mx = canvas.width - mSize - mPadding;
-        const my = canvas.height - mSize - mPadding;
-
+        const mSize = 150;
+        const mx = canvas.width - 170;
+        const my = canvas.height - 170;
         ctx.fillStyle = "rgba(0,0,0,0.5)";
-        ctx.strokeStyle = "rgba(255,255,255,0.2)";
-        ctx.lineWidth = 2;
         ctx.fillRect(mx, my, mSize, mSize);
+        ctx.strokeStyle = "rgba(255,255,255,0.2)";
         ctx.strokeRect(mx, my, mSize, mSize);
-
-        // Map Dots
         bots.forEach(b => {
-            ctx.fillStyle = "rgba(255,255,255,0.5)";
-            ctx.beginPath();
-            ctx.arc(mx + (b.x/WORLD_SIZE)*mSize, my + (b.y/WORLD_SIZE)*mSize, 2, 0, Math.PI*2);
-            ctx.fill();
+            ctx.fillStyle = "white";
+            ctx.fillRect(mx + (b.x/WORLD_SIZE)*mSize, my + (b.y/WORLD_SIZE)*mSize, 2, 2);
         });
-        
         ctx.fillStyle = "#ffcc00";
         ctx.beginPath();
-        ctx.arc(mx + (player.x/WORLD_SIZE)*mSize, my + (player.y/WORLD_SIZE)*mSize, 4, 0, Math.PI*2);
+        ctx.arc(mx + (player.x/WORLD_SIZE)*mSize, my + (player.y/WORLD_SIZE)*mSize, 3, 0, Math.PI*2);
         ctx.fill();
 
         // Leaderboard
         let top = [player, ...bots].sort((a,b) => b.length - a.length).slice(0, 5);
         ctx.fillStyle = "rgba(0,0,0,0.3)";
-        ctx.fillRect(canvas.width - 200, 20, 180, 130);
-        ctx.fillStyle = "white";
-        ctx.font = "14px sans-serif";
+        ctx.fillRect(canvas.width - 190, 20, 170, 120);
+        ctx.textAlign = "left";
         top.forEach((d, i) => {
-            let label = d === player ? "> " + d.name : d.name;
             ctx.fillStyle = d === player ? "#ffcc00" : "white";
-            ctx.fillText(`${i+1}. ${label.substring(0,12)}`, canvas.width - 190, 45 + i*20);
-            ctx.textAlign = "right";
-            ctx.fillText(Math.floor(d.length), canvas.width - 30, 45 + i*20);
-            ctx.textAlign = "left";
+            ctx.fillText(`${i+1}. ${d.name.substring(0,10)}`, canvas.width - 180, 45 + i*20);
         });
     }
 }
@@ -397,7 +409,6 @@ function loop() {
     draw();
     requestAnimationFrame(loop);
 }
-
 loop();
 </script>
 </body>
