@@ -87,7 +87,7 @@ class Dog {
         for(let i=0; i<15; i++) this.segments.push({x:x, y:y});
     }
 
-    width() { return 12 + this.length * 0.006; } // Slower visual growth rate
+    width() { return 12 + this.length * 0.006; }
 
     update(allDogs, allFoods) {
         let speed = 5.2; 
@@ -100,11 +100,12 @@ class Dog {
             let avoidX = 0, avoidY = 0, danger = false;
             let distToPlayer = Math.hypot(this.x - player.x, this.y - player.y);
 
-            // 1. AVOIDANCE LOGIC
-            let senseDist = 160; 
+            // 1. REDUCED AVOIDANCE: Only react if very close
+            let senseDist = 110; 
             for(let d of allDogs) {
                 if (d === this) continue;
-                for(let i=0; i<Math.min(d.segments.length, 30); i+=10) {
+                // Bots now only pay attention to the front of other dogs
+                for(let i=0; i<Math.min(d.segments.length, 20); i+=10) {
                     let s = d.segments[i];
                     let dx = this.x - s.x;
                     let dy = this.y - s.y;
@@ -121,11 +122,11 @@ class Dog {
                 let diff = escapeAngle - this.angle;
                 while (diff < -Math.PI) diff += Math.PI * 2;
                 while (diff > Math.PI) diff -= Math.PI * 2;
-                this.angle += diff * 0.08;
+                this.angle += diff * 0.06; // Slower turn rate = more mistakes
             } else {
-                // 2. SCAVENGER LOGIC (Look for big dots)
+                // 2. SCAVENGER LOGIC
                 let bestFood = null;
-                let minDist = 350; // Sensing range for dropped food
+                let minDist = 400; 
                 for(let f of allFoods) {
                     if(f.drop) {
                         let d = Math.hypot(this.x - f.x, this.y - f.y);
@@ -138,32 +139,32 @@ class Dog {
                     let diff = foodAngle - this.angle;
                     while (diff < -Math.PI) diff += Math.PI * 2;
                     while (diff > Math.PI) diff -= Math.PI * 2;
-                    this.angle += diff * 0.15;
-                    speed = 7.5; // Speed up to get the food!
+                    this.angle += diff * 0.18;
+                    speed = 7.8; 
                     this.isBoosting = true;
-                } else if (distToPlayer < 600) {
-                    // 3. ATTACK LOGIC (Increased aggression)
-                    let targetX = player.x + Math.cos(player.angle) * 150; 
-                    let targetY = player.y + Math.sin(player.angle) * 150;
+                } else if (distToPlayer < 650) {
+                    // 3. AGGRESSIVE ATTACK (Closer following)
+                    let targetX = player.x + Math.cos(player.angle) * 100; 
+                    let targetY = player.y + Math.sin(player.angle) * 100;
                     let attackAngle = Math.atan2(targetY - this.y, targetX - this.x);
                     let diff = attackAngle - this.angle;
                     while (diff < -Math.PI) diff += Math.PI * 2;
                     while (diff > Math.PI) diff -= Math.PI * 2;
-                    this.angle += diff * 0.07; // Snappier attacking
-                    if(distToPlayer < 300) { speed = 7.0; this.isBoosting = true; }
+                    this.angle += diff * 0.08; 
+                    if(distToPlayer < 350) { speed = 7.2; this.isBoosting = true; }
                 } else {
                     this.angle += (Math.random() - 0.5) * 0.08;
                 }
             }
 
-            const margin = 120;
+            const margin = 100;
             if(this.x < margin || this.x > WORLD_SIZE-margin || this.y < margin || this.y > WORLD_SIZE-margin) {
-                this.angle += 0.15;
+                this.angle += 0.1;
             }
         }
 
         if (this.isBoosting) {
-            this.length -= 0.1; // Slower length penalty for boosting
+            this.length -= 0.1; 
             if (Math.random() > 0.9) foods.push(new Food(this.segments[this.segments.length-1].x, this.segments[this.segments.length-1].y, 3, 0.5, true));
         }
 
@@ -277,7 +278,7 @@ function loop() {
         for(let d of all) {
             let dx = d.x - f.x, dy = d.y - f.y;
             if (dx*dx + dy*dy < (d.width()+12)**2) {
-                d.length += (f.val * 0.6); // Slightly slower growth per food
+                d.length += (f.val * 0.6); 
                 if (f.drop) foods.splice(i,1);
                 else { f.x = Math.random()*WORLD_SIZE; f.y = Math.random()*WORLD_SIZE; }
                 eaten = true;
