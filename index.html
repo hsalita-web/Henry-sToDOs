@@ -61,7 +61,7 @@ window.addEventListener('resize', resize); resize();
 
 const WORLD_SIZE = 5000; 
 const FOOD_COUNT = 500; 
-const BOT_COUNT = 15; // Reduced bot count
+const BOT_COUNT = 15; 
 const FUNNY_NAMES = ["Bark_Twain", "Oscar_Mayer", "Frank_Furter", "Sausage_Slayer", "Glizzy_God", "Mustard_Mane", "Wiener_Winner", "Link_Lover", "Bun_Burner", "Sub_Woofer"];
 
 let player, bots=[], foods=[], gameActive = false, kills = 0, mouseAngle = 0;
@@ -87,9 +87,9 @@ class Dog {
         for(let i=0; i<15; i++) this.segments.push({x:x, y:y});
     }
 
-    width() { return 12 + this.length * 0.008; }
+    width() { return 12 + this.length * 0.006; } // Slower visual growth rate
 
-    update(allDogs) {
+    update(allDogs, allFoods) {
         let speed = 5.2; 
         this.isBoosting = false;
 
@@ -100,11 +100,10 @@ class Dog {
             let avoidX = 0, avoidY = 0, danger = false;
             let distToPlayer = Math.hypot(this.x - player.x, this.y - player.y);
 
-            // "Dumbed down" avoidance: Bots wait longer to react
+            // 1. AVOIDANCE LOGIC
             let senseDist = 160; 
             for(let d of allDogs) {
                 if (d === this) continue;
-                // Only check head/neck area for avoidance to make them easier to trap
                 for(let i=0; i<Math.min(d.segments.length, 30); i+=10) {
                     let s = d.segments[i];
                     let dx = this.x - s.x;
@@ -122,18 +121,39 @@ class Dog {
                 let diff = escapeAngle - this.angle;
                 while (diff < -Math.PI) diff += Math.PI * 2;
                 while (diff > Math.PI) diff -= Math.PI * 2;
-                this.angle += diff * 0.08; // Slower turn rate = easier to kill
-            } else if (distToPlayer < 500) {
-                // Slightly sloppy attacking
-                let targetX = player.x + (Math.random() - 0.5) * 50; 
-                let targetY = player.y + (Math.random() - 0.5) * 50;
-                let attackAngle = Math.atan2(targetY - this.y, targetX - this.x);
-                let diff = attackAngle - this.angle;
-                while (diff < -Math.PI) diff += Math.PI * 2;
-                while (diff > Math.PI) diff -= Math.PI * 2;
-                this.angle += diff * 0.04; 
+                this.angle += diff * 0.08;
             } else {
-                this.angle += (Math.random() - 0.5) * 0.08;
+                // 2. SCAVENGER LOGIC (Look for big dots)
+                let bestFood = null;
+                let minDist = 350; // Sensing range for dropped food
+                for(let f of allFoods) {
+                    if(f.drop) {
+                        let d = Math.hypot(this.x - f.x, this.y - f.y);
+                        if(d < minDist) { minDist = d; bestFood = f; }
+                    }
+                }
+
+                if(bestFood) {
+                    let foodAngle = Math.atan2(bestFood.y - this.y, bestFood.x - this.x);
+                    let diff = foodAngle - this.angle;
+                    while (diff < -Math.PI) diff += Math.PI * 2;
+                    while (diff > Math.PI) diff -= Math.PI * 2;
+                    this.angle += diff * 0.15;
+                    speed = 7.5; // Speed up to get the food!
+                    this.isBoosting = true;
+                } else if (distToPlayer < 600) {
+                    // 3. ATTACK LOGIC (Increased aggression)
+                    let targetX = player.x + Math.cos(player.angle) * 150; 
+                    let targetY = player.y + Math.sin(player.angle) * 150;
+                    let attackAngle = Math.atan2(targetY - this.y, targetX - this.x);
+                    let diff = attackAngle - this.angle;
+                    while (diff < -Math.PI) diff += Math.PI * 2;
+                    while (diff > Math.PI) diff -= Math.PI * 2;
+                    this.angle += diff * 0.07; // Snappier attacking
+                    if(distToPlayer < 300) { speed = 7.0; this.isBoosting = true; }
+                } else {
+                    this.angle += (Math.random() - 0.5) * 0.08;
+                }
             }
 
             const margin = 120;
@@ -143,8 +163,8 @@ class Dog {
         }
 
         if (this.isBoosting) {
-            this.length -= 0.12;
-            if (Math.random() > 0.85) foods.push(new Food(this.segments[this.segments.length-1].x, this.segments[this.segments.length-1].y, 3, 0.8, true));
+            this.length -= 0.1; // Slower length penalty for boosting
+            if (Math.random() > 0.9) foods.push(new Food(this.segments[this.segments.length-1].x, this.segments[this.segments.length-1].y, 3, 0.5, true));
         }
 
         this.x += Math.cos(this.angle) * speed;
@@ -169,7 +189,6 @@ class Dog {
         ctx.translate(hx, hy);
         ctx.rotate(this.angle);
         
-        // Red Collar
         ctx.fillStyle = "#ff4444"; 
         ctx.fillRect(-w*0.2, -w*0.5, w*0.3, w);
         ctx.fillStyle = "#ffd700"; 
@@ -202,7 +221,7 @@ class Food {
     constructor(x, y, size=4, val=2, drop=false) {
         this.x=x; this.y=y; this.size=size; this.val=val; this.drop=drop;
         this.color = drop ? "#ffcc00" : `hsl(${Math.random()*360},80%,70%)`;
-        this.life = 600; 
+        this.life = 800; 
     }
     draw(camera) {
         ctx.fillStyle = this.color;
@@ -216,10 +235,8 @@ for(let i=0; i<BOT_COUNT; i++) spawnBot();
 
 function spawnBot() {
     let colors = ['#e67e22', '#e74c3c', '#9b59b6', '#3498db', '#2ecc71', '#f1c40f'];
-    // 75% Regular Size (40-100), 25% Large (up to 1200)
     let isLarge = Math.random() > 0.75;
     let randSize = isLarge ? (400 + Math.random() * 800) : (40 + Math.random() * 60);
-    
     bots.push(new Dog(Math.random()*WORLD_SIZE, Math.random()*WORLD_SIZE, colors[Math.floor(Math.random()*colors.length)], FUNNY_NAMES[Math.floor(Math.random()*FUNNY_NAMES.length)], false, randSize));
 }
 
@@ -249,20 +266,24 @@ function loop() {
     ctx.strokeRect(-camera.x, -camera.y, WORLD_SIZE, WORLD_SIZE);
 
     let all = [player, ...bots];
-    player.update(all);
-    bots.forEach(b => b.update(all));
+    player.update(all, foods);
+    bots.forEach(b => b.update(all, foods));
 
     for (let i = foods.length-1; i>=0; i--) {
         let f = foods[i];
-        if (f.drop) { f.life--; if(f.life <= 0) foods.splice(i,1); }
-        all.forEach(d => {
+        if (f.drop) { f.life--; if(f.life <= 0) { foods.splice(i,1); continue; } }
+        
+        let eaten = false;
+        for(let d of all) {
             let dx = d.x - f.x, dy = d.y - f.y;
             if (dx*dx + dy*dy < (d.width()+12)**2) {
-                d.length += f.val;
+                d.length += (f.val * 0.6); // Slightly slower growth per food
                 if (f.drop) foods.splice(i,1);
                 else { f.x = Math.random()*WORLD_SIZE; f.y = Math.random()*WORLD_SIZE; }
+                eaten = true;
+                break;
             }
-        });
+        }
     }
 
     if (gameActive) {
