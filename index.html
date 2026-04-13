@@ -2,38 +2,51 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Wiener.io - Juiced & Fixed</title>
+    <title>Wiener.io</title>
     <style>
-        body { margin:0; overflow:hidden; background:#0f172a; color:white; font-family: 'Segoe UI', sans-serif; }
+        body { margin:0; overflow:hidden; background:#1e293b; color:white; font-family: 'Segoe UI', Tahoma, sans-serif; }
         canvas { display:block; }
+        
         #overlay {
             position: absolute; top:0; left:0; width:100%; height:100%;
             display: flex; align-items: center; justify-content: center;
-            background: rgba(15, 23, 42, 0.9); z-index: 100;
+            background: rgba(15, 23, 42, 0.85); z-index: 100;
         }
+        
         .ui-card {
-            background: #1e293b; padding: 40px; border-radius: 30px; 
-            text-align: center; border: 2px solid #ffcc00; box-shadow: 0 0 50px rgba(0,0,0,0.5);
+            background: rgba(30, 41, 59, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 30px; border-radius: 24px; border: 1px solid rgba(255,255,255,0.1);
+            text-align: center; box-shadow: 0 20px 50px rgba(0,0,0,0.6); min-width: 320px;
         }
-        h1 { color: #ffcc00; font-size: 48px; margin: 0 0 20px 0; text-shadow: 3px 3px 0 #8B4513; }
-        input { display:block; margin: 0 auto 20px; padding:12px; border-radius:10px; border:none; width:220px; text-align:center; font-size:16px; }
-        button { 
-            padding: 15px 40px; font-size: 20px; font-weight: bold; 
-            background: #ffcc00; border: none; border-radius: 15px; cursor: pointer; color: #1e293b;
-        }
-        button:hover { background: #ffe066; transform: scale(1.05); }
+
+        h1 { margin-top: 0; color: #ffcc00; font-size: 42px; text-shadow: 3px 3px 0px #8B4513; }
+        .input-group { margin: 15px 0; text-align: left; }
+        label { display: block; margin-bottom: 5px; font-size: 11px; font-weight: bold; text-transform: uppercase; opacity: 0.7; }
+        input[type="text"] { width: 100%; padding: 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.2); background: #0f172a; color: white; font-size: 16px; box-sizing: border-box; outline: none; }
+        input[type="color"] { width: 100%; height: 40px; border: none; border-radius: 10px; background: none; cursor: pointer; }
+        button { width: 100%; padding: 16px; border-radius: 10px; border: none; background: #ffcc00; color: #0f172a; font-weight: 800; font-size: 18px; cursor: pointer; transition: 0.2s; }
+        button:hover { background: #ffe066; transform: scale(1.02); }
+        #stats-summary { display: none; margin-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 15px; }
     </style>
 </head>
 <body>
 
 <div id="overlay">
     <div class="ui-card">
-        <h1 id="title-text">Wiener.io</h1>
-        <div id="death-stats" style="display:none; margin-bottom:20px;">
-            <h2 style="color:#ff4444; margin:0;">WASTED!</h2>
-            <p style="font-size:20px;">Kills: <span id="final-kills" style="color:#ffcc00;">0</span> | Length: <span id="final-score" style="color:#ffcc00;">0</span></p>
+        <div id="stats-summary">
+            <h2 style="margin:0; color:#ff4444;">Wieners Wasted!</h2>
+            <p>Kills: <span id="final-kills" style="color:#ffcc00; font-weight:bold;">0</span> | Max Length: <span id="final-score" style="color:#ffcc00; font-weight:bold;">0</span></p>
         </div>
-        <input type="text" id="name" value="LongBoi">
+        <h1>Wiener.io</h1>
+        <div class="input-group">
+            <label>Dachshund Name</label>
+            <input type="text" id="name" value="LongBoi">
+        </div>
+        <div class="input-group">
+            <label>Coat Color</label>
+            <input type="color" id="color" value="#8B4513">
+        </div>
         <button onclick="startGame()">UNLEASH THE HOUND</button>
     </div>
 </div>
@@ -46,12 +59,12 @@ const ctx = canvas.getContext('2d');
 function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
 window.addEventListener('resize', resize); resize();
 
-const WORLD_SIZE = 5000;
-const BOT_COUNT = 15;
-const FOOD_COUNT = 400;
+const WORLD_SIZE = 5000; 
+const FOOD_COUNT = 500; 
+const BOT_COUNT = 15; 
+const FUNNY_NAMES = ["Bark_Twain", "Oscar_Mayer", "Frank_Furter", "Sausage_Slayer", "Glizzy_God", "Mustard_Mane", "Wiener_Winner", "Link_Lover", "Bun_Burner", "Sub_Woofer"];
 
-let player = null, bots=[], foods=[], particles=[], gameActive = false, kills = 0, mouseAngle = 0;
-let sugarRushActive = 0;
+let player, bots=[], foods=[], gameActive = false, kills = 0, mouseAngle = 0;
 
 document.addEventListener('mousemove', e => {
     mouseAngle = Math.atan2(e.clientY - canvas.height/2, e.clientX - canvas.width/2);
@@ -61,229 +74,257 @@ let playerBoosting = false;
 document.addEventListener('mousedown', () => playerBoosting = true);
 document.addEventListener('mouseup', () => playerBoosting = false);
 
-class Particle {
-    constructor(x, y, color, speed, size, life) {
-        this.x = x; this.y = y; this.color = color;
-        this.vx = (Math.random()-0.5) * speed;
-        this.vy = (Math.random()-0.5) * speed;
-        this.size = size; this.life = life; this.maxLife = life;
-    }
-    update() { this.x += this.vx; this.y += this.vy; this.life--; }
-    draw(cam) {
-        ctx.save();
-        ctx.globalAlpha = this.life / this.maxLife;
-        ctx.fillStyle = this.color;
-        ctx.beginPath(); ctx.arc(this.x - cam.x, this.y - cam.y, this.size, 0, Math.PI*2); ctx.fill();
-        ctx.restore();
-    }
-}
-
 class Dog {
-    constructor(x, y, color, name, isPlayer = false, startLen = 40) {
-        this.x = x; this.y = y; this.segments = [];
-        this.length = startLen; this.color = color; this.name = name;
-        this.isPlayer = isPlayer; this.angle = Math.random() * Math.PI*2;
+    constructor(x, y, color, name, isPlayer = false, startLength = 40) {
+        this.x = x; this.y = y;
+        this.segments = [];
+        this.length = startLength;
+        this.angle = Math.random() * Math.PI * 2;
+        this.color = color;
+        this.name = name;
+        this.isPlayer = isPlayer;
         this.isBoosting = false;
-        for(let i=0; i<this.length; i++) this.segments.push({x:x, y:y});
+        for(let i=0; i<15; i++) this.segments.push({x:x, y:y});
     }
 
-    width() { return 12 + this.length * 0.005; }
+    width() { return 12 + this.length * 0.006; }
 
     update(allDogs, allFoods) {
-        let speed = 3.8;
+        let speed = 3.8; // Lowered from 5.2
         this.isBoosting = false;
 
         if (this.isPlayer) {
             this.angle = mouseAngle;
-            if ((playerBoosting && this.length > 30) || sugarRushActive > 0) {
-                speed = sugarRushActive > 0 ? 7.5 : 6.0;
-                this.isBoosting = true;
-            }
+            if (playerBoosting && this.length > 30) { speed = 6.2; this.isBoosting = true; } // Lowered from 8.5
         } else {
+            let avoidX = 0, avoidY = 0, danger = false;
             let distToPlayer = Math.hypot(this.x - player.x, this.y - player.y);
-            let targetFood = allFoods.find(f => f.special || (f.drop && Math.hypot(this.x-f.x, this.y-f.y) < 400));
-            
-            if (targetFood) {
-                let fAngle = Math.atan2(targetFood.y - this.y, targetFood.x - this.x);
-                let diff = fAngle - this.angle;
-                while(diff < -Math.PI) diff += Math.PI*2; while(diff > Math.PI) diff -= Math.PI*2;
-                this.angle += diff * 0.1;
-                speed = 5.8; this.isBoosting = true;
-            } else if (distToPlayer < 600) {
-                let pAngle = Math.atan2(player.y - this.y, player.x - this.x);
-                let diff = pAngle - this.angle;
-                while(diff < -Math.PI) diff += Math.PI*2; while(diff > Math.PI) diff -= Math.PI*2;
-                this.angle += diff * 0.05;
+
+            // 1. MINIMAL AVOIDANCE
+            let senseDist = 60; 
+            for(let d of allDogs) {
+                if (d === this) continue;
+                let s = d.segments[0];
+                let dx = this.x - s.x;
+                let dy = this.y - s.y;
+                let distSq = dx*dx + dy*dy;
+                if (distSq < senseDist * senseDist) {
+                    avoidX += dx; avoidY += dy;
+                    danger = true;
+                }
+            }
+
+            if (danger) {
+                let escapeAngle = Math.atan2(avoidY, avoidX);
+                let diff = escapeAngle - this.angle;
+                while (diff < -Math.PI) diff += Math.PI * 2;
+                while (diff > Math.PI) diff -= Math.PI * 2;
+                this.angle += diff * 0.03; // Even slower turn
+            } else {
+                // 2. SCAVENGER LOGIC
+                let bestFood = null;
+                let minDist = 450; 
+                for(let f of allFoods) {
+                    if(f.drop) {
+                        let d = Math.hypot(this.x - f.x, this.y - f.y);
+                        if(d < minDist) { minDist = d; bestFood = f; }
+                    }
+                }
+
+                if(bestFood) {
+                    let foodAngle = Math.atan2(bestFood.y - this.y, bestFood.x - this.x);
+                    let diff = foodAngle - this.angle;
+                    while (diff < -Math.PI) diff += Math.PI * 2;
+                    while (diff > Math.PI) diff -= Math.PI * 2;
+                    this.angle += diff * 0.12; 
+                    speed = 5.8; // Lowered scavenger speed
+                    this.isBoosting = true;
+                } else if (distToPlayer < 700) {
+                    // 3. AGGRESSIVE ATTACK
+                    let targetX = player.x + Math.cos(player.angle) * 70; 
+                    let targetY = player.y + Math.sin(player.angle) * 70;
+                    let attackAngle = Math.atan2(targetY - this.y, targetX - this.x);
+                    let diff = attackAngle - this.angle;
+                    while (diff < -Math.PI) diff += Math.PI * 2;
+                    while (diff > Math.PI) diff -= Math.PI * 2;
+                    this.angle += diff * 0.07; 
+                    if(distToPlayer < 350) { speed = 5.5; this.isBoosting = true; }
+                } else {
+                    this.angle += (Math.random() - 0.5) * 0.08;
+                }
+            }
+
+            const margin = 80;
+            if(this.x < margin || this.x > WORLD_SIZE-margin || this.y < margin || this.y > WORLD_SIZE-margin) {
+                this.angle += 0.15;
             }
         }
 
-        if (this.isBoosting && Math.random() > 0.7) {
-            particles.push(new Particle(this.x, this.y, "rgba(255,255,255,0.2)", 1, 2, 15));
+        if (this.isBoosting) {
+            this.length -= 0.08; 
+            if (Math.random() > 0.9) foods.push(new Food(this.segments[this.segments.length-1].x, this.segments[this.segments.length-1].y, 3, 0.5, true));
         }
 
         this.x += Math.cos(this.angle) * speed;
         this.y += Math.sin(this.angle) * speed;
         this.segments.unshift({x: this.x, y: this.y});
-        while (this.segments.length > this.length) this.segments.pop();
-
-        if (this.isBoosting) {
-            if (!this.isPlayer) this.length -= 0.05;
-            else if (sugarRushActive <= 0) this.length -= 0.08;
-        }
+        if (this.segments.length > this.length) this.segments.pop();
     }
 
-    draw(cam) {
+    draw(camera) {
         let w = this.width();
-        ctx.strokeStyle = (this.isPlayer && sugarRushActive > 0) ? `hsl(${Date.now()%360}, 80%, 60%)` : this.color;
-        ctx.lineWidth = w; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+        ctx.strokeStyle = this.color;
+        ctx.lineWidth = w;
+        ctx.lineCap = 'round'; ctx.lineJoin = 'round';
         ctx.beginPath();
-        for (let s of this.segments) ctx.lineTo(s.x - cam.x, s.y - cam.y);
+        for (let s of this.segments) ctx.lineTo(s.x - camera.x, s.y - camera.y);
         ctx.stroke();
 
         let h = this.segments[0];
-        let hx = h.x - cam.x, hy = h.y - cam.y;
+        let hx = h.x - camera.x, hy = h.y - camera.y;
+
         ctx.save();
-        ctx.translate(hx, hy); ctx.rotate(this.angle);
+        ctx.translate(hx, hy);
+        ctx.rotate(this.angle);
+        
+        ctx.fillStyle = "#ff4444"; 
+        ctx.fillRect(-w*0.2, -w*0.5, w*0.3, w);
+        ctx.fillStyle = "#ffd700"; 
+        ctx.beginPath(); ctx.arc(0, w*0.4, w*0.15, 0, Math.PI*2); ctx.fill();
+
         ctx.fillStyle = this.color;
         ctx.beginPath(); ctx.ellipse(w*0.5, 0, w*0.75, w*0.48, 0, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.ellipse(-2, -w*0.6, w*0.55, w*0.35, Math.PI/3, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.ellipse(-2, w*0.6, w*0.55, w*0.35, -Math.PI/3, 0, Math.PI*2); ctx.fill();
         
-        if (this.length > 150) { // Shades
-            ctx.fillStyle = "#111"; ctx.fillRect(w*0.3, -w*0.4, w*0.3, w*0.8);
-        }
-        if (this.length > 300) { // Crown
-            ctx.fillStyle = "#ffd700"; ctx.beginPath();
-            ctx.moveTo(0, -w*0.5); ctx.lineTo(w*0.2, -w*0.8); ctx.lineTo(w*0.4, -w*0.5);
-            ctx.lineTo(w*0.6, -w*0.8); ctx.lineTo(w*0.8, -w*0.5); ctx.fill();
-        }
+        ctx.fillStyle = "#111";
+        ctx.beginPath(); ctx.arc(w*1.2, 0, w*0.18, 0, Math.PI*2); ctx.fill();
+        
+        const eyeRadius = 5.5; const pupilRadius = 2.5;
+        const eyeLat = w * 0.35; const eyeLong = w * 0.3; 
         ctx.fillStyle = "white";
-        ctx.beginPath(); ctx.arc(w*0.3, -w*0.25, 3, 0, Math.PI*2); ctx.fill();
-        ctx.beginPath(); ctx.arc(w*0.3, w*0.25, 3, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(eyeLong, -eyeLat, eyeRadius, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(eyeLong, eyeLat, eyeRadius, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = "black";
+        ctx.beginPath(); ctx.arc(eyeLong + 1, -eyeLat, pupilRadius, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(eyeLong + 1, eyeLat, pupilRadius, 0, Math.PI*2); ctx.fill();
         ctx.restore();
+
+        ctx.fillStyle = "white"; ctx.font = "bold 13px sans-serif"; ctx.textAlign = "center";
+        ctx.fillText(this.name, hx, hy - w - 15);
     }
 }
 
 class Food {
-    constructor(x, y, special = false) {
-        this.x = x; this.y = y; this.special = special;
-        this.drop = false; this.val = special ? 30 : 2;
-        this.size = special ? 10 : 4;
-        this.color = special ? "#ffd700" : `hsl(${Math.random()*360}, 70%, 60%)`;
+    constructor(x, y, size=4, val=2, drop=false) {
+        this.x=x; this.y=y; this.size=size; this.val=val; this.drop=drop;
+        this.color = drop ? "#ffcc00" : `hsl(${Math.random()*360},80%,70%)`;
+        this.life = 800; 
     }
-    draw(cam) {
-        if (this.special) { ctx.shadowBlur = 15; ctx.shadowColor = "gold"; }
+    draw(camera) {
         ctx.fillStyle = this.color;
-        ctx.beginPath(); ctx.arc(this.x - cam.x, this.y - cam.y, this.size, 0, Math.PI*2); ctx.fill();
-        ctx.shadowBlur = 0;
+        ctx.beginPath(); ctx.arc(this.x-camera.x, this.y-camera.y, this.size, 0, Math.PI*2); ctx.fill();
     }
 }
+
+player = new Dog(WORLD_SIZE/2, WORLD_SIZE/2, "#8B4513", "...", false);
+for(let i=0; i<FOOD_COUNT; i++) foods.push(new Food(Math.random()*WORLD_SIZE, Math.random()*WORLD_SIZE));
+for(let i=0; i<BOT_COUNT; i++) spawnBot();
 
 function spawnBot() {
-    let colors = ['#e67e22', '#e74c3c', '#9b59b6', '#3498db', '#2ecc71'];
-    bots.push(new Dog(Math.random()*WORLD_SIZE, Math.random()*WORLD_SIZE, colors[Math.floor(Math.random()*colors.length)], "Bot", false, 40 + Math.random()*100));
-}
-
-function explode(x, y, color) {
-    for(let i=0; i<25; i++) particles.push(new Particle(x, y, color, 6, 4, 40));
+    let colors = ['#e67e22', '#e74c3c', '#9b59b6', '#3498db', '#2ecc71', '#f1c40f'];
+    let isLarge = Math.random() > 0.75;
+    let randSize = isLarge ? (400 + Math.random() * 800) : (40 + Math.random() * 60);
+    bots.push(new Dog(Math.random()*WORLD_SIZE, Math.random()*WORLD_SIZE, colors[Math.floor(Math.random()*colors.length)], FUNNY_NAMES[Math.floor(Math.random()*FUNNY_NAMES.length)], false, randSize));
 }
 
 function startGame() {
-    kills = 0; sugarRushActive = 0; foods = []; bots = []; particles = [];
-    player = new Dog(WORLD_SIZE/2, WORLD_SIZE/2, "#8B4513", document.getElementById('name').value, true);
-    for(let i=0; i<FOOD_COUNT; i++) foods.push(new Food(Math.random()*WORLD_SIZE, Math.random()*WORLD_SIZE));
-    for(let i=0; i<BOT_COUNT; i++) spawnBot();
+    kills = 0;
+    player = new Dog(WORLD_SIZE/2, WORLD_SIZE/2, document.getElementById('color').value, document.getElementById('name').value, true);
     document.getElementById('overlay').style.display = 'none';
     gameActive = true;
 }
 
-function loop() {
-    if (!player) { requestAnimationFrame(loop); return; }
-    
-    ctx.fillStyle = "#0f172a"; ctx.fillRect(0,0,canvas.width,canvas.height);
-    let cam = { x: player.x - canvas.width/2, y: player.y - canvas.height/2 };
-
-    if (sugarRushActive > 0) sugarRushActive--;
-
-    // Particles
-    particles.forEach((p, i) => { p.update(); p.draw(cam); if(p.life <= 0) particles.splice(i,1); });
-
-    // Food
-    if (Math.random() < 0.003) foods.push(new Food(Math.random()*WORLD_SIZE, Math.random()*WORLD_SIZE, true));
-    foods.forEach(f => f.draw(cam));
-
-    // Update Player & Bots
-    let all = [player, ...bots];
-    all.forEach(d => { d.update(all, foods); d.draw(cam); });
-
-    // Eating
-    for(let i=foods.length-1; i>=0; i--) {
-        let f = foods[i];
-        all.forEach(d => {
-            if(Math.hypot(d.x-f.x, d.y-f.y) < d.width() + 5) {
-                d.length += f.val * 0.5;
-                if(f.special && d.isPlayer) sugarRushActive = 300;
-                foods.splice(i,1);
-                if(!f.drop && !f.special) foods.push(new Food(Math.random()*WORLD_SIZE, Math.random()*WORLD_SIZE));
-            }
-        });
+function checkCollision(dog, others) {
+    for (let o of others) {
+        for (let i=0; i<o.segments.length; i++) {
+            if (i < 12 && o === dog) continue; 
+            let s = o.segments[i];
+            let dx = dog.x - s.x, dy = dog.y - s.y;
+            if (dx*dx + dy*dy < (o.width()/2 + 6)**2) return true;
+        }
     }
-
-    // Collisions
-    if(gameActive) {
-        // Boundary check
-        if(player.x<0 || player.x>WORLD_SIZE || player.y<0 || player.y>WORLD_SIZE) playerHit();
-        
-        bots.forEach((b, bi) => {
-            let hit = false;
-            if(b.x<0 || b.x>WORLD_SIZE || b.y<0 || b.y>WORLD_SIZE) hit = true;
-            
-            // Check if Bot hits Player or other Bots
-            [player, ...bots].forEach(other => {
-                if(b === other) return;
-                for(let j=0; j<other.segments.length; j+=10) {
-                    if(Math.hypot(b.x-other.segments[j].x, b.y-other.segments[j].y) < other.width()/2 + 5) hit = true;
-                }
-            });
-
-            if(hit) {
-                explode(b.x, b.y, b.color);
-                if(Math.hypot(b.x-player.x, b.y-player.y) < 600) kills++;
-                for(let j=0; j<b.segments.length; j+=8) {
-                    let f = new Food(b.segments[j].x, b.segments[j].y); f.drop = true; f.val = 4; foods.push(f);
-                }
-                bots.splice(bi, 1); spawnBot();
-            }
-        });
-
-        // Check if Player hits Bots
-        bots.forEach(b => {
-            for(let j=0; j<b.segments.length; j+=10) {
-                if(Math.hypot(player.x-b.segments[j].x, player.y-b.segments[j].y) < b.width()/2 + 5) playerHit();
-            }
-        });
-    }
-
-    function playerHit() {
-        if(!gameActive) return;
-        gameActive = false;
-        explode(player.x, player.y, player.color);
-        setTimeout(() => {
-            document.getElementById('overlay').style.display = 'flex';
-            document.getElementById('death-stats').style.display = 'block';
-            document.getElementById('final-kills').innerText = kills;
-            document.getElementById('final-score').innerText = Math.floor(player.length);
-        }, 500);
-    }
-
-    // UI
-    if(gameActive) {
-        ctx.fillStyle = "white"; ctx.font = "bold 20px sans-serif";
-        ctx.fillText(`Kills: ${kills} | Length: ${Math.floor(player.length)}`, 25, 45);
-        if(sugarRushActive > 0) { ctx.fillStyle = "gold"; ctx.fillText("SUGAR RUSH!!", 25, 75); }
-    }
-
-    requestAnimationFrame(loop);
+    return false;
 }
 
+function loop() {
+    ctx.fillStyle = '#0f172a'; ctx.fillRect(0,0,canvas.width,canvas.height);
+    let camera = { x: player.x - canvas.width/2, y: player.y - canvas.height/2 };
+    ctx.strokeStyle = '#334155'; ctx.lineWidth = 55; 
+    ctx.strokeRect(-camera.x, -camera.y, WORLD_SIZE, WORLD_SIZE);
+
+    let all = [player, ...bots];
+    player.update(all, foods);
+    bots.forEach(b => b.update(all, foods));
+
+    for (let i = foods.length-1; i>=0; i--) {
+        let f = foods[i];
+        if (f.drop) { f.life--; if(f.life <= 0) { foods.splice(i,1); continue; } }
+        
+        for(let d of all) {
+            let dx = d.x - f.x, dy = d.y - f.y;
+            if (dx*dx + dy*dy < (d.width()+12)**2) {
+                d.length += (f.val * 0.6); 
+                if (f.drop) foods.splice(i,1);
+                else { f.x = Math.random()*WORLD_SIZE; f.y = Math.random()*WORLD_SIZE; }
+                break;
+            }
+        }
+    }
+
+    if (gameActive) {
+        if (player.x<0 || player.x>WORLD_SIZE || player.y<0 || player.y>WORLD_SIZE || checkCollision(player, bots)) {
+            gameActive = false;
+            document.getElementById('final-kills').innerText = kills;
+            document.getElementById('final-score').innerText = Math.floor(player.length);
+            document.getElementById('stats-summary').style.display = 'block';
+            document.getElementById('overlay').style.display = 'flex';
+        }
+        for (let i = bots.length-1; i>=0; i--) {
+            if (bots[i].x<0 || bots[i].x>WORLD_SIZE || bots[i].y<0 || bots[i].y>WORLD_SIZE || checkCollision(bots[i], [player, ...bots.filter((_,j)=>j!==i)])) {
+                if (Math.hypot(bots[i].x-player.x, bots[i].y-player.y) < 500) kills++;
+                for(let j=0; j<bots[i].segments.length; j+=8) foods.push(new Food(bots[i].segments[j].x, bots[i].segments[j].y, 6, 4, true));
+                bots.splice(i,1); spawnBot();
+            }
+        }
+    }
+
+    foods.forEach(f => f.draw(camera));
+    bots.forEach(b => b.draw(camera));
+    if (gameActive) player.draw(camera);
+
+    if (gameActive) {
+        ctx.fillStyle = "rgba(0,0,0,0.5)"; ctx.fillRect(canvas.width - 200, 20, 180, 230);
+        ctx.fillStyle = "#ffcc00"; ctx.font = "bold 16px sans-serif"; ctx.textAlign = "center";
+        ctx.fillText("LEADER BOARD", canvas.width - 110, 45);
+        let lb = [player, ...bots].sort((a,b) => b.length - a.length).slice(0, 8);
+        ctx.font = "14px sans-serif"; ctx.textAlign = "left";
+        lb.forEach((d, i) => {
+            ctx.fillStyle = (d === player) ? "#ffcc00" : "white";
+            ctx.fillText(`${i+1}. ${d.name.substring(0,10)}`, canvas.width - 190, 75 + i*20);
+            ctx.textAlign = "right"; ctx.fillText(Math.floor(d.length), canvas.width - 35, 75 + i*20);
+            ctx.textAlign = "left";
+        });
+        const ms = 150, mx = canvas.width - 175, my = canvas.height - 175;
+        ctx.strokeStyle = "#94a3b8"; ctx.lineWidth = 3; ctx.strokeRect(mx-2, my-2, ms+4, ms+4);
+        ctx.fillStyle = "rgba(0,0,0,0.6)"; ctx.fillRect(mx, my, ms, ms);
+        bots.forEach(b => { ctx.fillStyle = "rgba(255,255,255,0.4)"; ctx.fillRect(mx + (b.x/WORLD_SIZE)*ms, my + (b.y/WORLD_SIZE)*ms, 2, 2); });
+        ctx.fillStyle = "#ffcc00"; ctx.beginPath(); ctx.arc(mx+(player.x/WORLD_SIZE)*ms, my+(player.y/WORLD_SIZE)*ms, 3.5, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = "white"; ctx.font = "bold 20px sans-serif";
+        ctx.fillText(`Kills: ${kills} | Length: ${Math.floor(player.length)}`, 25, canvas.height - 30);
+    }
+    requestAnimationFrame(loop);
+}
 loop();
 </script>
 </body>
