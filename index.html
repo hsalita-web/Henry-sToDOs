@@ -4,23 +4,19 @@
 <meta charset="UTF-8">
 <title>Wiener.io</title>
 <style>
-  body {
-    margin: 0;
-    overflow: hidden;
-    background: #111;
-    color: white;
-    font-family: Arial;
-  }
-  #ui {
-    position: absolute;
-    top: 10px;
-    left: 10px;
-    z-index: 10;
+  body { margin:0; overflow:hidden; background:#111; color:white; font-family:Arial; }
+  #menu {
+    position:absolute; top:20px; left:20px; z-index:20;
+    background:rgba(0,0,0,0.5); padding:10px; border-radius:10px;
   }
 </style>
 </head>
 <body>
-<div id="ui">Wiener.io — Eat to grow. Avoid others.</div>
+<div id="menu">
+  Name: <input id="name" value="Player"><br>
+  Color: <input type="color" id="color" value="#ff9900"><br>
+  <button onclick="startGame()">Start</button>
+</div>
 <canvas id="game"></canvas>
 
 <script>
@@ -29,83 +25,112 @@ const ctx = canvas.getContext('2d');
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
-const FOOD_COUNT = 200;
-const BOT_COUNT = 5;
+const WORLD_SIZE = 3000;
+const FOOD_COUNT = 300;
+const BOT_COUNT = 10;
 
-let mouse = { x: canvas.width/2, y: canvas.height/2 };
+let mouseAngle = 0;
 document.addEventListener('mousemove', e => {
-  mouse.x = e.clientX;
-  mouse.y = e.clientY;
+  mouseAngle = Math.atan2(e.clientY - canvas.height/2, e.clientX - canvas.width/2);
 });
 
+let boosting = false;
+document.addEventListener('mousedown', ()=> boosting = true);
+document.addEventListener('mouseup', ()=> boosting = false);
+
 class Dog {
-  constructor(x,y,color,isPlayer=false) {
+  constructor(x,y,color,name,isPlayer=false) {
     this.x = x;
     this.y = y;
     this.segments = [];
-    this.length = 20;
+    this.length = 30;
     this.angle = 0;
-    this.speed = 2;
+    this.baseSpeed = 2;
     this.color = color;
     this.isPlayer = isPlayer;
+    this.name = name;
   }
 
   update() {
+    let speed = this.baseSpeed;
+
     if (this.isPlayer) {
-      this.angle = Math.atan2(mouse.y - this.y, mouse.x - this.x);
+      this.angle = mouseAngle;
+      if (boosting && this.length > 20) {
+        speed = 4;
+        this.length -= 0.2;
+      }
     } else {
-      this.angle += (Math.random()-0.5)*0.2;
+      this.angle += (Math.random()-0.5)*0.3;
     }
 
-    this.x += Math.cos(this.angle) * this.speed;
-    this.y += Math.sin(this.angle) * this.speed;
+    this.x += Math.cos(this.angle) * speed;
+    this.y += Math.sin(this.angle) * speed;
 
     this.segments.unshift({x:this.x,y:this.y});
     while (this.segments.length > this.length) this.segments.pop();
   }
 
-  draw() {
+  draw(camera) {
     ctx.fillStyle = this.color;
-    for (let i=0;i<this.segments.length;i++) {
-      let s = this.segments[i];
+
+    for (let s of this.segments) {
       ctx.beginPath();
-      ctx.arc(s.x, s.y, 6, 0, Math.PI*2);
+      ctx.arc(s.x - camera.x, s.y - camera.y, 6, 0, Math.PI*2);
       ctx.fill();
     }
 
-    // head + eyes
     let head = this.segments[0];
-    ctx.fillStyle = "#fff";
-    ctx.beginPath(); ctx.arc(head.x-3, head.y-2, 2, 0, Math.PI*2); ctx.fill();
-    ctx.beginPath(); ctx.arc(head.x+3, head.y-2, 2, 0, Math.PI*2); ctx.fill();
+    if (!head) return;
+
+    ctx.fillStyle = "white";
+    ctx.beginPath(); ctx.arc(head.x-camera.x-3, head.y-camera.y-2, 2, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(head.x-camera.x+3, head.y-camera.y-2, 2, 0, Math.PI*2); ctx.fill();
+
+    ctx.fillStyle = "white";
+    ctx.fillText(this.name, head.x-camera.x-10, head.y-camera.y-10);
   }
 }
 
 class Food {
   constructor() {
-    this.x = Math.random()*canvas.width;
-    this.y = Math.random()*canvas.height;
+    this.x = Math.random()*WORLD_SIZE;
+    this.y = Math.random()*WORLD_SIZE;
   }
 
-  draw() {
+  draw(camera) {
     ctx.fillStyle = "lime";
     ctx.beginPath();
-    ctx.arc(this.x,this.y,3,0,Math.PI*2);
+    ctx.arc(this.x-camera.x,this.y-camera.y,3,0,Math.PI*2);
     ctx.fill();
   }
 }
 
-let player = new Dog(canvas.width/2, canvas.height/2, "orange", true);
+let player;
 let bots = [];
 let foods = [];
 
-for (let i=0;i<BOT_COUNT;i++) {
-  bots.push(new Dog(Math.random()*canvas.width, Math.random()*canvas.height, "hsl("+Math.random()*360+",100%,50%)"));
+function startGame() {
+  document.getElementById('menu').style.display = 'none';
+
+  player = new Dog(WORLD_SIZE/2, WORLD_SIZE/2,
+    document.getElementById('color').value,
+    document.getElementById('name').value,
+    true);
+
+  bots = [];
+  for (let i=0;i<BOT_COUNT;i++) {
+    bots.push(new Dog(Math.random()*WORLD_SIZE, Math.random()*WORLD_SIZE,
+      "hsl("+Math.random()*360+",100%,50%)","Bot"+i));
+  }
+
+  foods = [];
+  for (let i=0;i<FOOD_COUNT;i++) foods.push(new Food());
+
+  gameLoop();
 }
 
-for (let i=0;i<FOOD_COUNT;i++) foods.push(new Food());
-
-function checkCollisions(dog) {
+function eat(dog) {
   foods.forEach((f,i)=>{
     let dx = dog.x - f.x;
     let dy = dog.y - f.y;
@@ -116,37 +141,54 @@ function checkCollisions(dog) {
   });
 }
 
-function drawGrid() {
-  ctx.strokeStyle = "#222";
-  for (let x=0;x<canvas.width;x+=50) {
-    ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,canvas.height); ctx.stroke();
+function checkDeath(dog, others) {
+  for (let other of others) {
+    for (let seg of other.segments) {
+      if (Math.hypot(dog.x-seg.x, dog.y-seg.y) < 6) {
+        return true;
+      }
+    }
   }
-  for (let y=0;y<canvas.height;y+=50) {
-    ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(canvas.width,y); ctx.stroke();
-  }
+  return false;
 }
 
 function gameLoop() {
   ctx.clearRect(0,0,canvas.width,canvas.height);
 
-  drawGrid();
+  let camera = {
+    x: player.x - canvas.width/2,
+    y: player.y - canvas.height/2
+  };
 
-  foods.forEach(f=>f.draw());
+  foods.forEach(f=>f.draw(camera));
 
   player.update();
-  checkCollisions(player);
-  player.draw();
+  eat(player);
 
   bots.forEach(bot=>{
     bot.update();
-    checkCollisions(bot);
-    bot.draw();
+    eat(bot);
   });
+
+  // collisions
+  if (checkDeath(player, bots)) {
+    alert("You died!");
+    location.reload();
+  }
+
+  bots = bots.filter(bot => !checkDeath(bot, [player]));
+
+  // respawn bots
+  while (bots.length < BOT_COUNT) {
+    bots.push(new Dog(Math.random()*WORLD_SIZE, Math.random()*WORLD_SIZE,
+      "hsl("+Math.random()*360+",100%,50%)","Bot"+Math.floor(Math.random()*1000)));
+  }
+
+  player.draw(camera);
+  bots.forEach(bot=>bot.draw(camera));
 
   requestAnimationFrame(gameLoop);
 }
-
-gameLoop();
 </script>
 </body>
 </html>
