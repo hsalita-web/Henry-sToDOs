@@ -100,20 +100,19 @@ class Dog {
             let avoidX = 0, avoidY = 0, danger = false;
             let distToPlayer = Math.hypot(this.x - player.x, this.y - player.y);
 
-            // 1. REDUCED AVOIDANCE: Only react if very close
-            let senseDist = 110; 
+            // 1. MINIMAL AVOIDANCE (They are now much dumber)
+            // They only see things 70 pixels away (very close)
+            let senseDist = 70; 
             for(let d of allDogs) {
                 if (d === this) continue;
-                // Bots now only pay attention to the front of other dogs
-                for(let i=0; i<Math.min(d.segments.length, 20); i+=10) {
-                    let s = d.segments[i];
-                    let dx = this.x - s.x;
-                    let dy = this.y - s.y;
-                    let distSq = dx*dx + dy*dy;
-                    if (distSq < senseDist * senseDist) {
-                        avoidX += dx; avoidY += dy;
-                        danger = true;
-                    }
+                // They only check the very head of other dogs
+                let s = d.segments[0];
+                let dx = this.x - s.x;
+                let dy = this.y - s.y;
+                let distSq = dx*dx + dy*dy;
+                if (distSq < senseDist * senseDist) {
+                    avoidX += dx; avoidY += dy;
+                    danger = true;
                 }
             }
 
@@ -122,11 +121,11 @@ class Dog {
                 let diff = escapeAngle - this.angle;
                 while (diff < -Math.PI) diff += Math.PI * 2;
                 while (diff > Math.PI) diff -= Math.PI * 2;
-                this.angle += diff * 0.06; // Slower turn rate = more mistakes
+                this.angle += diff * 0.04; // Very slow reaction turn
             } else {
-                // 2. SCAVENGER LOGIC
+                // 2. SCAVENGER LOGIC (High Priority)
                 let bestFood = null;
-                let minDist = 400; 
+                let minDist = 500; 
                 for(let f of allFoods) {
                     if(f.drop) {
                         let d = Math.hypot(this.x - f.x, this.y - f.y);
@@ -139,27 +138,28 @@ class Dog {
                     let diff = foodAngle - this.angle;
                     while (diff < -Math.PI) diff += Math.PI * 2;
                     while (diff > Math.PI) diff -= Math.PI * 2;
-                    this.angle += diff * 0.18;
-                    speed = 7.8; 
+                    this.angle += diff * 0.2; // They snap toward food instantly
+                    speed = 8.0; 
                     this.isBoosting = true;
-                } else if (distToPlayer < 650) {
-                    // 3. AGGRESSIVE ATTACK (Closer following)
-                    let targetX = player.x + Math.cos(player.angle) * 100; 
-                    let targetY = player.y + Math.sin(player.angle) * 100;
+                } else if (distToPlayer < 700) {
+                    // 3. AGGRESSIVE ATTACK
+                    let targetX = player.x + Math.cos(player.angle) * 80; 
+                    let targetY = player.y + Math.sin(player.angle) * 80;
                     let attackAngle = Math.atan2(targetY - this.y, targetX - this.x);
                     let diff = attackAngle - this.angle;
                     while (diff < -Math.PI) diff += Math.PI * 2;
                     while (diff > Math.PI) diff -= Math.PI * 2;
-                    this.angle += diff * 0.08; 
-                    if(distToPlayer < 350) { speed = 7.2; this.isBoosting = true; }
+                    this.angle += diff * 0.09; 
+                    if(distToPlayer < 400) { speed = 7.5; this.isBoosting = true; }
                 } else {
-                    this.angle += (Math.random() - 0.5) * 0.08;
+                    this.angle += (Math.random() - 0.5) * 0.1;
                 }
             }
 
-            const margin = 100;
+            // Boundary checks
+            const margin = 80;
             if(this.x < margin || this.x > WORLD_SIZE-margin || this.y < margin || this.y > WORLD_SIZE-margin) {
-                this.angle += 0.1;
+                this.angle += 0.2;
             }
         }
 
