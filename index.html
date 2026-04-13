@@ -4,29 +4,93 @@
 <meta charset="UTF-8">
 <title>Wiener.io</title>
 <style>
-  body { margin:0; overflow:hidden; background:#0f172a; color:white; font-family:Arial; }
+  body { margin:0; overflow:hidden; background:#0f172a; color:white; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
   canvas { display:block; }
-  #menu { position:absolute; top:20px; left:20px; z-index:20; background:rgba(0,0,0,0.6); padding:10px; border-radius:10px; }
+  
+  /* Centered Aesthetic Menu */
+  #overlay {
+    position: absolute; top:0; left:0; width:100%; height:100%;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(15, 23, 42, 0.7); z-index: 100;
+  }
+  
+  .ui-card {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    padding: 40px;
+    border-radius: 20px;
+    border: 1px solid rgba(255,255,255,0.2);
+    text-align: center;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    min-width: 300px;
+  }
+
+  h1 { margin-top: 0; color: #ffcc00; font-size: 42px; text-shadow: 2px 2px 0px #8B4513; }
+  
+  .input-group { margin: 20px 0; text-align: left; }
+  label { display: block; margin-bottom: 5px; font-size: 14px; opacity: 0.8; }
+  
+  input[type="text"] {
+    width: 100%; padding: 12px; border-radius: 8px; border: none; 
+    background: rgba(255,255,255,0.2); color: white; font-size: 16px; box-sizing: border-box;
+  }
+
+  input[type="color"] {
+    width: 100%; height: 40px; border: none; border-radius: 8px; background: none; cursor: pointer;
+  }
+
+  button {
+    width: 100%; padding: 15px; border-radius: 8px; border: none;
+    background: #ffcc00; color: #0f172a; font-weight: bold; font-size: 18px;
+    cursor: pointer; transition: transform 0.2s, background 0.2s; margin-top: 10px;
+  }
+  button:hover { background: #ffe066; transform: scale(1.02); }
+
+  #stats-summary { display: none; margin-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 20px; }
+  .stat-val { font-size: 24px; color: #ffcc00; font-weight: bold; }
 </style>
 </head>
 <body>
-<div id="menu">
-  Name: <input id="name" value="Dachshund"><br>
-  Color: <input type="color" id="color" value="#8B4513"><br>
-  <button onclick="startGame()">Start</button>
+
+<div id="overlay">
+  <div class="ui-card">
+    <div id="stats-summary">
+      <h2 style="margin-top:0">Wieners Wasted!</h2>
+      <p>Kills: <span id="final-kills" class="stat-val">0</span></p>
+      <p>Max Length: <span id="final-score" class="stat-val">0</span></p>
+    </div>
+    
+    <h1>Wiener.io</h1>
+    
+    <div class="input-group">
+      <label>Dachshund Name</label>
+      <input type="text" id="name" placeholder="Enter Name..." value="Dachshund">
+    </div>
+    
+    <div class="input-group">
+      <label>Coat Color</label>
+      <input type="color" id="color" value="#8B4513">
+    </div>
+    
+    <button onclick="startGame()">UNLEASH THE HOUND</button>
+  </div>
 </div>
+
 <canvas id="game"></canvas>
+
 <script>
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
-// --- CONFIGURATION ---
 const WORLD_SIZE = 4000; 
 const FOOD_COUNT = 600;
 const BOT_COUNT = 15;
 const DROP_EXPIRY_MS = 15000; 
+
+let player, bots=[], foods=[], gameActive = false;
+let kills = 0;
 
 let mouseAngle = 0;
 document.addEventListener('mousemove', e => {
@@ -57,16 +121,14 @@ class Dog {
     this.isBoosting = false;
 
     if (this.isPlayer) {
-      this.angle = mouseAngle;
-      if (playerBoosting && this.length > 20) {
+      if(gameActive) this.angle = mouseAngle;
+      if (playerBoosting && this.length > 20 && gameActive) {
         speed = 3.8; 
         this.isBoosting = true;
       }
     } else {
-      let target = null;
-      let minDist = 900;
-      let avoidanceX = 0;
-      let avoidanceY = 0;
+      let target = null; let minDist = 900;
+      let avoidanceX = 0; let avoidanceY = 0;
       let inDanger = false;
 
       allDogs.forEach(d => {
@@ -81,11 +143,7 @@ class Dog {
         for (let i = 0; i < other.segments.length; i += 3) {
           let seg = other.segments[i];
           let dist = Math.hypot(this.x - seg.x, this.y - seg.y);
-          if (dist < 45) { 
-            avoidanceX += (this.x - seg.x) / dist;
-            avoidanceY += (this.y - seg.y) / dist;
-            inDanger = true;
-          }
+          if (dist < 45) { avoidanceX += (this.x - seg.x) / dist; avoidanceY += (this.y - seg.y) / dist; inDanger = true; }
         }
       }
 
@@ -103,11 +161,7 @@ class Dog {
         while (diff < -Math.PI) diff += Math.PI * 2;
         while (diff > Math.PI) diff -= Math.PI * 2;
         this.angle += diff * 0.1; 
-
-        if (minDist < 300 && this.length > 30) {
-          speed = 3.5;
-          this.isBoosting = true;
-        }
+        if (minDist < 300 && this.length > 30) { speed = 3.5; this.isBoosting = true; }
       } else if (!inDanger) {
         this.angle += (Math.random()-0.5)*0.05;
       }
@@ -123,7 +177,6 @@ class Dog {
 
     this.x += Math.cos(this.angle) * speed;
     this.y += Math.sin(this.angle) * speed;
-
     this.segments.unshift({x:this.x, y:this.y});
     while (this.segments.length > this.length) this.segments.pop();
   }
@@ -132,41 +185,32 @@ class Dog {
     let w = this.width();
     ctx.strokeStyle = this.color;
     ctx.lineWidth = w;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
 
     ctx.beginPath();
     for (let i=0; i<this.segments.length; i++) {
       let s = this.segments[i];
-      let x = s.x - camera.x;
-      let y = s.y - camera.y;
-      if (i===0) ctx.moveTo(x,y);
-      else ctx.lineTo(x,y);
+      let x = s.x - camera.x; let y = s.y - camera.y;
+      if (i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
     }
     ctx.stroke();
 
-    let head = this.segments[0];
-    if (!head) return;
-    let hx = head.x - camera.x;
-    let hy = head.y - camera.y;
+    let head = this.segments[0]; if (!head) return;
+    let hx = head.x - camera.x; let hy = head.y - camera.y;
 
     ctx.save();
-    ctx.translate(hx, hy);
-    ctx.rotate(this.angle);
+    ctx.translate(hx, hy); ctx.rotate(this.angle);
     ctx.fillStyle = this.color;
     ctx.beginPath(); ctx.ellipse(w*0.7, 0, w*0.8, w*0.5, 0, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle = "black";
-    ctx.beginPath(); ctx.arc(w*1.4, 0, 2.5, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle = "white";
-    ctx.beginPath(); ctx.arc(2, -w/3, 2.5, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = "black"; ctx.beginPath(); ctx.arc(w*1.4, 0, 2.5, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = "white"; ctx.beginPath(); ctx.arc(2, -w/3, 2.5, 0, Math.PI*2); ctx.fill();
     ctx.beginPath(); ctx.arc(2, w/3, 2.5, 0, Math.PI*2); ctx.fill();
     ctx.fillStyle = "rgba(0,0,0,0.2)";
     ctx.beginPath(); ctx.ellipse(0, -w/1.5, w*0.6, w/3, Math.PI/4, 0, Math.PI*2); ctx.fill();
     ctx.beginPath(); ctx.ellipse(0, w/1.5, w*0.6, w/3, -Math.PI/4, 0, Math.PI*2); ctx.fill();
     ctx.restore();
 
-    ctx.fillStyle = "white";
-    ctx.font = "bold 11px Arial";
+    ctx.fillStyle = "white"; ctx.font = "bold 11px Arial";
     ctx.fillText(this.name, hx-15, hy - (w + 10));
   }
 }
@@ -174,27 +218,25 @@ class Dog {
 class Food {
   constructor(x,y,size=3,value=1.5, isDrop=false) {
     this.x=x; this.y=y; this.size=size; this.value=value;
-    this.isDrop = isDrop;
-    this.spawnTime = Date.now();
+    this.isDrop = isDrop; this.spawnTime = Date.now();
   }
   draw(camera) {
     ctx.fillStyle = this.isDrop ? "rgba(255, 215, 0, 0.9)" : "rgba(144, 238, 144, 0.7)";
-    ctx.beginPath();
-    ctx.arc(this.x-camera.x,this.y-camera.y,this.size,0,Math.PI*2);
-    ctx.fill();
+    ctx.beginPath(); ctx.arc(this.x-camera.x,this.y-camera.y,this.size,0,Math.PI*2); ctx.fill();
   }
 }
 
-let player, bots=[], foods=[];
+// Initialize "Background" objects immediately
+for(let i=0;i<BOT_COUNT;i++) spawnBot();
+for(let i=0;i<FOOD_COUNT;i++) foods.push(new Food(Math.random()*WORLD_SIZE,Math.random()*WORLD_SIZE));
+// Create a dummy player for the camera while on menu
+player = new Dog(WORLD_SIZE/2, WORLD_SIZE/2, "#8B4513", "...", false);
 
 function startGame() {
-  document.getElementById('menu').style.display='none';
+  document.getElementById('overlay').style.display='none';
+  kills = 0;
   player = new Dog(WORLD_SIZE/2, WORLD_SIZE/2, document.getElementById('color').value, document.getElementById('name').value, true);
-  bots=[];
-  for(let i=0;i<BOT_COUNT;i++) spawnBot();
-  foods=[];
-  for(let i=0;i<FOOD_COUNT;i++) foods.push(new Food(Math.random()*WORLD_SIZE,Math.random()*WORLD_SIZE));
-  gameLoop();
+  gameActive = true;
 }
 
 function spawnBot(){
@@ -223,7 +265,7 @@ function checkDeath(dog, others){
   for(let other of others){
     for(let i=0; i<other.segments.length; i++){
       if(other === dog && i < 12) continue; 
-      if(Math.hypot(dog.x-other.segments[i].x, dog.y-other.segments[i].y) < other.width()/2 + 2) return true;
+      if(Math.hypot(dog.x-other.segments[i].x, dog.y-other.segments[i].y) < other.width()/2 + 2) return {killer: other};
     }
   }
   return false;
@@ -231,90 +273,70 @@ function checkDeath(dog, others){
 
 function gameLoop(){
   ctx.clearRect(0,0,canvas.width,canvas.height);
-  let camera={x:player.x-canvas.width/2,y:player.y-canvas.height/2};
+  let camera={x:player.x-canvas.width/2, y:player.y-canvas.height/2};
 
-  // Border
-  ctx.strokeStyle='red';
-  ctx.lineWidth = 10;
+  ctx.strokeStyle='red'; ctx.lineWidth = 10;
   ctx.strokeRect(-camera.x,-camera.y,WORLD_SIZE,WORLD_SIZE);
 
   let now = Date.now();
   foods = foods.filter(f => !f.isDrop || (now - f.spawnTime < DROP_EXPIRY_MS));
-
   foods.forEach(f=>f.draw(camera));
 
   let allDogs = [player, ...bots];
   player.update(allDogs); 
-  eat(player);
+  if(gameActive) eat(player);
 
   bots.forEach(bot=>{ bot.update(allDogs); eat(bot); });
 
-  if(checkDeath(player, bots)){
-    alert("Dog down! Final Score: " + Math.floor(player.length));
-    location.reload();
-    return;
-  }
+  if(gameActive){
+    let pDeath = checkDeath(player, bots);
+    if(pDeath){
+      gameActive = false;
+      document.getElementById('final-kills').innerText = kills;
+      document.getElementById('final-score').innerText = Math.floor(player.length);
+      document.getElementById('stats-summary').style.display = 'block';
+      document.getElementById('overlay').style.display = 'flex';
+      return requestAnimationFrame(gameLoop);
+    }
 
-  for(let i=bots.length-1; i>=0; i--){
-    if(checkDeath(bots[i], [player, ...bots.filter((_,idx)=>idx!==i)])){
-      dropFood(bots[i]);
-      bots.splice(i,1);
+    for(let i=bots.length-1; i>=0; i--){
+      let bDeath = checkDeath(bots[i], [player, ...bots.filter((_,idx)=>idx!==i)]);
+      if(bDeath){
+        if(bDeath.killer === player) kills++;
+        dropFood(bots[i]);
+        bots.splice(i,1);
+      }
     }
   }
 
   while(bots.length < BOT_COUNT) spawnBot();
 
   bots.forEach(bot=>bot.draw(camera));
-  player.draw(camera);
+  if(gameActive) player.draw(camera);
 
-  // --- LEADERBOARD ---
-  let sorted = [...allDogs].sort((a,b)=>b.length-a.length);
-  ctx.fillStyle='rgba(0,0,0,0.4)';
-  ctx.fillRect(canvas.width-180, 10, 170, 165);
-  ctx.fillStyle='white';
-  ctx.font = "bold 14px Arial";
-  ctx.fillText("LEADERBOARD", canvas.width-170, 30);
-  ctx.font = "12px Arial";
-  for(let i=0; i<8; i++) {
-    if(sorted[i]) {
-      let isYou = sorted[i] === player;
-      ctx.fillStyle = isYou ? "#ffcc00" : "white";
-      let nameText = `${i+1}. ${sorted[i].name.substring(0,10)}`;
-      let scoreText = Math.floor(sorted[i].length);
-      ctx.fillText(nameText, canvas.width-170, 55 + i*15);
-      ctx.fillText(scoreText, canvas.width-40, 55 + i*15);
+  if(gameActive){
+    // Leaderboard
+    let sorted = [...allDogs].sort((a,b)=>b.length-a.length);
+    ctx.fillStyle='rgba(0,0,0,0.4)'; ctx.fillRect(canvas.width-180, 10, 170, 165);
+    ctx.fillStyle='white'; ctx.font = "bold 14px Arial"; ctx.fillText("LEADERBOARD", canvas.width-170, 30);
+    for(let i=0; i<8; i++) {
+      if(sorted[i]) {
+        ctx.fillStyle = sorted[i] === player ? "#ffcc00" : "white";
+        ctx.fillText(`${i+1}. ${sorted[i].name.substring(0,10)}`, canvas.width-170, 55 + i*15);
+        ctx.fillText(Math.floor(sorted[i].length), canvas.width-40, 55 + i*15);
+      }
     }
+    // Score & Minimap
+    ctx.fillStyle='white'; ctx.font = "20px Arial"; ctx.fillText("Length: "+Math.floor(player.length), 20, canvas.height-20);
+    let ms=150; let mx=canvas.width-ms-20; let my=canvas.height-ms-20;
+    ctx.fillStyle="rgba(0,0,0,0.5)"; ctx.fillRect(mx, my, ms, ms);
+    ctx.fillStyle="#ffcc00"; ctx.beginPath(); ctx.arc(mx + (player.x/WORLD_SIZE)*ms, my + (player.y/WORLD_SIZE)*ms, 3, 0, Math.PI*2); ctx.fill();
   }
-
-  // --- SCORE UI ---
-  ctx.fillStyle='white';
-  ctx.font = "20px Arial";
-  ctx.fillText("Length: "+Math.floor(player.length), 20, canvas.height-20);
-
-  // --- MINI-MAP RESTORED ---
-  let mapSize = 150;
-  let mapX = canvas.width - mapSize - 20;
-  let mapY = canvas.height - mapSize - 20;
-
-  // Map Background
-  ctx.fillStyle = "rgba(0,0,0,0.5)";
-  ctx.fillRect(mapX, mapY, mapSize, mapSize);
-  
-  // Map Border
-  ctx.strokeStyle = "rgba(255,255,255,0.3)";
-  ctx.lineWidth = 2;
-  ctx.strokeRect(mapX, mapY, mapSize, mapSize);
-
-  // Player Position Dot
-  let px = (player.x / WORLD_SIZE) * mapSize;
-  let py = (player.y / WORLD_SIZE) * mapSize;
-  ctx.fillStyle = "#ffcc00"; // Bright orange/yellow dot
-  ctx.beginPath();
-  ctx.arc(mapX + px, mapY + py, 3, 0, Math.PI * 2);
-  ctx.fill();
 
   requestAnimationFrame(gameLoop);
 }
+
+gameLoop();
 </script>
 </body>
 </html>
