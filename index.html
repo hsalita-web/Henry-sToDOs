@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <title>Wiener.io</title>
     <style>
-        body { margin:0; overflow:hidden; background:#0f172a; color:white; font-family: 'Segoe UI', Tahoma, sans-serif; }
+        body { margin:0; overflow:hidden; background:#1e293b; color:white; font-family: 'Segoe UI', Tahoma, sans-serif; }
         canvas { display:block; }
         
         #overlay {
@@ -29,7 +29,7 @@
         .input-group { margin: 15px 0; text-align: left; }
         label { display: block; margin-bottom: 5px; font-size: 11px; font-weight: bold; text-transform: uppercase; opacity: 0.7; }
         
-        input[type="text"], select {
+        input[type="text"] {
             width: 100%; padding: 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.2); 
             background: #0f172a; color: white; font-size: 16px; box-sizing: border-box; outline: none;
         }
@@ -61,14 +61,6 @@
             <input type="text" id="name" value="LongBoi">
         </div>
         <div class="input-group">
-            <label>Difficulty</label>
-            <select id="difficulty">
-                <option value="easy">Easy (Puppy)</option>
-                <option value="hard" selected>Hard (Hot Dog)</option>
-                <option value="difficult">Difficult (Alpha Hound)</option>
-            </select>
-        </div>
-        <div class="input-group">
             <label>Coat Color</label>
             <input type="color" id="color" value="#8B4513">
         </div>
@@ -89,7 +81,7 @@ const FOOD_COUNT = 450;
 const BOT_COUNT = 16;
 const FUNNY_NAMES = ["Bark_Twain", "Oscar_Mayer", "Frank_Furter", "Sausage_Slayer", "Glizzy_God", "Mustard_Mane", "Wiener_Winner", "Link_Lover", "Bun_Burner", "Sub_Woofer"];
 
-let player, bots=[], foods=[], gameActive = false, kills = 0, mouseAngle = 0, diffSetting = 'hard';
+let player, bots=[], foods=[], gameActive = false, kills = 0, mouseAngle = 0;
 
 document.addEventListener('mousemove', e => {
     mouseAngle = Math.atan2(e.clientY - canvas.height/2, e.clientX - canvas.width/2);
@@ -125,13 +117,13 @@ class Dog {
                 this.isBoosting = true; 
             }
         } else {
-            // REBALANCED AI: Half as reactive
+            // Original balanced AI logic
             let avoidX = 0, avoidY = 0, danger = false;
-            const margin = 100; // Smaller wall margin so they aren't so scared
+            const margin = 100;
             if(this.x < margin) avoidX += 1; else if(this.x > WORLD_SIZE-margin) avoidX -= 1;
             if(this.y < margin) avoidY += 1; else if(this.y > WORLD_SIZE-margin) avoidY -= 1;
 
-            let senseDist = diffSetting === 'easy' ? 60 : (diffSetting === 'hard' ? 120 : 180);
+            let senseDist = 140;
             
             for(let d of allDogs) {
                 if (d === this) continue;
@@ -149,17 +141,9 @@ class Dog {
                 let diff = escapeAngle - this.angle;
                 while (diff < -Math.PI) diff += Math.PI * 2;
                 while (diff > Math.PI) diff -= Math.PI * 2;
-                
-                // Turn speed cut in half
-                let turnSpeed = diffSetting === 'easy' ? 0.04 : (diffSetting === 'hard' ? 0.07 : 0.09);
-                this.angle += diff * turnSpeed;
-                
-                // Boosting logic rebalanced
-                if(danger && diffSetting === 'difficult' && Math.random() > 0.5) {
-                    speed = 7.0; this.isBoosting = true;
-                }
+                this.angle += diff * 0.08;
             } else {
-                this.angle += (Math.random() - 0.5) * 0.1;
+                this.angle += (Math.random() - 0.5) * 0.12;
             }
         }
 
@@ -198,7 +182,7 @@ class Dog {
         ctx.fillStyle = "#111";
         ctx.beginPath(); ctx.arc(w*1.2, 0, w*0.18, 0, Math.PI*2); ctx.fill();
         
-        // EYE LOGIC - White circle with small black pupil
+        // EYES: White circle + black pupil
         const eyeRadius = 5.5; 
         const pupilRadius = 2.5;
         const eyeLat = w * 0.35; 
@@ -240,7 +224,7 @@ function spawnBot() {
 }
 
 function startGame() {
-    kills = 0; diffSetting = document.getElementById('difficulty').value;
+    kills = 0;
     player = new Dog(WORLD_SIZE/2, WORLD_SIZE/2, document.getElementById('color').value, document.getElementById('name').value, true);
     document.getElementById('overlay').style.display = 'none';
     gameActive = true;
@@ -259,17 +243,16 @@ function checkCollision(dog, others) {
 }
 
 function loop() {
-    ctx.fillStyle = '#0f172a'; ctx.fillRect(0,0,canvas.width,canvas.height);
+    // SOLID BACKGROUND
+    ctx.fillStyle = '#0f172a'; 
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+    
     let camera = { x: player.x - canvas.width/2, y: player.y - canvas.height/2 };
     
-    // Clean Grid Background
-    ctx.strokeStyle = "rgba(255,255,255,0.03)";
-    for(let i=0; i<WORLD_SIZE; i+=100) {
-        ctx.beginPath(); ctx.moveTo(i-camera.x, -camera.y); ctx.lineTo(i-camera.x, WORLD_SIZE-camera.y); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(-camera.x, i-camera.y); ctx.lineTo(WORLD_SIZE-camera.x, i-camera.y); ctx.stroke();
-    }
-
-    ctx.strokeStyle = '#334155'; ctx.lineWidth = 15; ctx.strokeRect(-camera.x, -camera.y, WORLD_SIZE, WORLD_SIZE);
+    // VISIBLE WORLD MAT
+    ctx.strokeStyle = '#334155'; 
+    ctx.lineWidth = 40; // Thick border
+    ctx.strokeRect(-camera.x, -camera.y, WORLD_SIZE, WORLD_SIZE);
 
     let all = [player, ...bots];
     player.update(all);
@@ -288,7 +271,6 @@ function loop() {
     });
 
     if (gameActive) {
-        // Player death
         if (player.x<0 || player.x>WORLD_SIZE || player.y<0 || player.y>WORLD_SIZE || checkCollision(player, bots)) {
             gameActive = false;
             document.getElementById('final-kills').innerText = kills;
@@ -296,7 +278,6 @@ function loop() {
             document.getElementById('stats-summary').style.display = 'block';
             document.getElementById('overlay').style.display = 'flex';
         }
-        // Bot death
         for (let i = bots.length-1; i>=0; i--) {
             if (bots[i].x<0 || bots[i].x>WORLD_SIZE || bots[i].y<0 || bots[i].y>WORLD_SIZE || checkCollision(bots[i], [player, ...bots.filter((_,j)=>j!==i)])) {
                 if (Math.hypot(bots[i].x-player.x, bots[i].y-player.y) < 350) kills++;
@@ -311,7 +292,7 @@ function loop() {
     if (gameActive) player.draw(camera);
 
     if (gameActive) {
-        // Leaderboard
+        // LEADERBOARD
         let lb = [player, ...bots].sort((a,b) => b.length - a.length).slice(0, 5);
         ctx.fillStyle = "rgba(0,0,0,0.4)";
         ctx.fillRect(canvas.width - 180, 20, 160, 140);
@@ -325,11 +306,10 @@ function loop() {
             ctx.textAlign = "left";
         });
 
-        // Kill count and Length UI
         ctx.fillStyle = "white"; ctx.font = "bold 20px sans-serif";
         ctx.fillText(`Kills: ${kills} | Length: ${Math.floor(player.length)}`, 25, canvas.height - 30);
         
-        // Minimap
+        // MINIMAP
         const ms = 150, mx = canvas.width - 175, my = canvas.height - 175;
         ctx.fillStyle = "rgba(0,0,0,0.6)"; ctx.fillRect(mx, my, ms, ms);
         bots.forEach(b => { ctx.fillStyle = "rgba(255,255,255,0.4)"; ctx.fillRect(mx + (b.x/WORLD_SIZE)*ms, my + (b.y/WORLD_SIZE)*ms, 2, 2); });
