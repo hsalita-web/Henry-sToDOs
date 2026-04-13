@@ -90,12 +90,12 @@ class Dog {
     width() { return 12 + this.length * 0.006; }
 
     update(allDogs, allFoods) {
-        let speed = 3.8; // Lowered from 5.2
+        let speed = 3.8; 
         this.isBoosting = false;
 
         if (this.isPlayer) {
             this.angle = mouseAngle;
-            if (playerBoosting && this.length > 30) { speed = 6.2; this.isBoosting = true; } // Lowered from 8.5
+            if (playerBoosting && this.length > 30) { speed = 6.2; this.isBoosting = true; }
         } else {
             let avoidX = 0, avoidY = 0, danger = false;
             let distToPlayer = Math.hypot(this.x - player.x, this.y - player.y);
@@ -119,15 +119,19 @@ class Dog {
                 let diff = escapeAngle - this.angle;
                 while (diff < -Math.PI) diff += Math.PI * 2;
                 while (diff > Math.PI) diff -= Math.PI * 2;
-                this.angle += diff * 0.03; // Even slower turn
+                this.angle += diff * 0.03; 
             } else {
-                // 2. SCAVENGER LOGIC
+                // 2. SCAVENGER LOGIC (Updated to ignore self-food)
                 let bestFood = null;
                 let minDist = 450; 
                 for(let f of allFoods) {
                     if(f.drop) {
                         let d = Math.hypot(this.x - f.x, this.y - f.y);
-                        if(d < minDist) { minDist = d; bestFood = f; }
+                        // If it's too close (likely their own tail), they ignore it
+                        if(d < minDist && d > 60) { 
+                            minDist = d; 
+                            bestFood = f; 
+                        }
                     }
                 }
 
@@ -137,7 +141,7 @@ class Dog {
                     while (diff < -Math.PI) diff += Math.PI * 2;
                     while (diff > Math.PI) diff -= Math.PI * 2;
                     this.angle += diff * 0.12; 
-                    speed = 5.8; // Lowered scavenger speed
+                    speed = 5.8; 
                     this.isBoosting = true;
                 } else if (distToPlayer < 700) {
                     // 3. AGGRESSIVE ATTACK
