@@ -115,7 +115,6 @@ class Dog {
     width() { return 12 + this.length * 0.01; }
 
     update(allDogs) {
-        // Base speed increased 1.5x from previous (approx 5.25)
         let speed = 5.2; 
         this.isBoosting = false;
 
@@ -126,30 +125,14 @@ class Dog {
                 this.isBoosting = true; 
             }
         } else {
-            // AI Logic
-            let targetAngle = this.angle;
+            // REBALANCED AI: Half as reactive
             let avoidX = 0, avoidY = 0, danger = false;
-            
-            // Wall avoidance
-            const margin = 150;
+            const margin = 100; // Smaller wall margin so they aren't so scared
             if(this.x < margin) avoidX += 1; else if(this.x > WORLD_SIZE-margin) avoidX -= 1;
             if(this.y < margin) avoidY += 1; else if(this.y > WORLD_SIZE-margin) avoidY -= 1;
 
-            let senseDist = diffSetting === 'easy' ? 100 : (diffSetting === 'hard' ? 180 : 280);
+            let senseDist = diffSetting === 'easy' ? 60 : (diffSetting === 'hard' ? 120 : 180);
             
-            // Find closest target or threat
-            let closestPlayer = player; 
-            let distToPlayer = Math.hypot(this.x - player.x, this.y - player.y);
-
-            // AGGRESSIVE AI: If difficult, they try to head-off the player
-            if (diffSetting === 'difficult' && distToPlayer < 500) {
-                // Aim slightly ahead of player to "cut them off"
-                let leadX = player.x + Math.cos(player.angle) * 100;
-                let leadY = player.y + Math.sin(player.angle) * 100;
-                targetAngle = Math.atan2(leadY - this.y, leadX - this.x);
-                if (distToPlayer < 200) { speed = 7.5; this.isBoosting = true; }
-            }
-
             for(let d of allDogs) {
                 if (d === this) continue;
                 let dx = this.x - d.x;
@@ -167,17 +150,16 @@ class Dog {
                 while (diff < -Math.PI) diff += Math.PI * 2;
                 while (diff > Math.PI) diff -= Math.PI * 2;
                 
-                // Bots have slightly lower turn speed than player so you can kill them
-                let turnSpeed = diffSetting === 'easy' ? 0.08 : (diffSetting === 'hard' ? 0.14 : 0.18);
+                // Turn speed cut in half
+                let turnSpeed = diffSetting === 'easy' ? 0.04 : (diffSetting === 'hard' ? 0.07 : 0.09);
                 this.angle += diff * turnSpeed;
-            } else if (diffSetting === 'difficult') {
-                // Smoothly steer towards the target angle if no danger
-                let diff = targetAngle - this.angle;
-                while (diff < -Math.PI) diff += Math.PI * 2;
-                while (diff > Math.PI) diff -= Math.PI * 2;
-                this.angle += diff * 0.1;
+                
+                // Boosting logic rebalanced
+                if(danger && diffSetting === 'difficult' && Math.random() > 0.5) {
+                    speed = 7.0; this.isBoosting = true;
+                }
             } else {
-                this.angle += (Math.random() - 0.5) * 0.15;
+                this.angle += (Math.random() - 0.5) * 0.1;
             }
         }
 
@@ -209,22 +191,18 @@ class Dog {
         ctx.rotate(this.angle);
         ctx.fillStyle = this.color;
         
-        // Head
         ctx.beginPath(); ctx.ellipse(w*0.5, 0, w*0.75, w*0.48, 0, 0, Math.PI*2); ctx.fill();
-        
-        // Floppy Ears
         ctx.beginPath(); ctx.ellipse(-2, -w*0.6, w*0.55, w*0.35, Math.PI/3, 0, Math.PI*2); ctx.fill();
         ctx.beginPath(); ctx.ellipse(-2, w*0.6, w*0.55, w*0.35, -Math.PI/3, 0, Math.PI*2); ctx.fill();
         
-        // Nose
         ctx.fillStyle = "#111";
         ctx.beginPath(); ctx.arc(w*1.2, 0, w*0.18, 0, Math.PI*2); ctx.fill();
         
-        // PERFECT EYES: Consistent white circles + small black pupils
+        // EYE LOGIC - White circle with small black pupil
         const eyeRadius = 5.5; 
         const pupilRadius = 2.5;
-        const eyeLat = w * 0.35; // Lateral offset
-        const eyeLong = w * 0.3; // Longitudinal offset
+        const eyeLat = w * 0.35; 
+        const eyeLong = w * 0.3; 
 
         ctx.fillStyle = "white";
         ctx.beginPath(); ctx.arc(eyeLong, -eyeLat, eyeRadius, 0, Math.PI*2); ctx.fill();
@@ -284,7 +262,7 @@ function loop() {
     ctx.fillStyle = '#0f172a'; ctx.fillRect(0,0,canvas.width,canvas.height);
     let camera = { x: player.x - canvas.width/2, y: player.y - canvas.height/2 };
     
-    // Grid
+    // Clean Grid Background
     ctx.strokeStyle = "rgba(255,255,255,0.03)";
     for(let i=0; i<WORLD_SIZE; i+=100) {
         ctx.beginPath(); ctx.moveTo(i-camera.x, -camera.y); ctx.lineTo(i-camera.x, WORLD_SIZE-camera.y); ctx.stroke();
@@ -310,6 +288,7 @@ function loop() {
     });
 
     if (gameActive) {
+        // Player death
         if (player.x<0 || player.x>WORLD_SIZE || player.y<0 || player.y>WORLD_SIZE || checkCollision(player, bots)) {
             gameActive = false;
             document.getElementById('final-kills').innerText = kills;
@@ -317,6 +296,7 @@ function loop() {
             document.getElementById('stats-summary').style.display = 'block';
             document.getElementById('overlay').style.display = 'flex';
         }
+        // Bot death
         for (let i = bots.length-1; i>=0; i--) {
             if (bots[i].x<0 || bots[i].x>WORLD_SIZE || bots[i].y<0 || bots[i].y>WORLD_SIZE || checkCollision(bots[i], [player, ...bots.filter((_,j)=>j!==i)])) {
                 if (Math.hypot(bots[i].x-player.x, bots[i].y-player.y) < 350) kills++;
@@ -331,8 +311,25 @@ function loop() {
     if (gameActive) player.draw(camera);
 
     if (gameActive) {
+        // Leaderboard
+        let lb = [player, ...bots].sort((a,b) => b.length - a.length).slice(0, 5);
+        ctx.fillStyle = "rgba(0,0,0,0.4)";
+        ctx.fillRect(canvas.width - 180, 20, 160, 140);
+        ctx.fillStyle = "white"; ctx.font = "bold 14px sans-serif"; ctx.textAlign = "left";
+        lb.forEach((d, i) => {
+            let color = (d === player) ? "#ffcc00" : "white";
+            ctx.fillStyle = color;
+            ctx.fillText(`${i+1}. ${d.name.substring(0,10)}`, canvas.width - 170, 45 + i*22);
+            ctx.textAlign = "right";
+            ctx.fillText(Math.floor(d.length), canvas.width - 30, 45 + i*22);
+            ctx.textAlign = "left";
+        });
+
+        // Kill count and Length UI
         ctx.fillStyle = "white"; ctx.font = "bold 20px sans-serif";
         ctx.fillText(`Kills: ${kills} | Length: ${Math.floor(player.length)}`, 25, canvas.height - 30);
+        
+        // Minimap
         const ms = 150, mx = canvas.width - 175, my = canvas.height - 175;
         ctx.fillStyle = "rgba(0,0,0,0.6)"; ctx.fillRect(mx, my, ms, ms);
         bots.forEach(b => { ctx.fillStyle = "rgba(255,255,255,0.4)"; ctx.fillRect(mx + (b.x/WORLD_SIZE)*ms, my + (b.y/WORLD_SIZE)*ms, 2, 2); });
