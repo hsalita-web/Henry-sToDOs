@@ -5,41 +5,54 @@
   <title>Weekly To-Do + Wiener Progress</title>
   <style>
     body {
-      font-family: Arial, sans-serif;
-      background: #f4f4f4;
+      margin: 0;
+      font-family: 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color: white;
       display: flex;
       flex-direction: column;
       align-items: center;
-      padding: 20px;
+      justify-content: center;
+      height: 100vh;
     }
 
     h1 {
-      margin-bottom: 10px;
+      margin-bottom: 20px;
     }
 
     .container {
-      background: white;
+      background: rgba(255,255,255,0.1);
+      backdrop-filter: blur(10px);
       padding: 20px;
-      border-radius: 10px;
-      box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-      width: 350px;
+      border-radius: 15px;
+      width: 400px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
     }
 
     input {
       width: 70%;
-      padding: 8px;
+      padding: 10px;
+      border-radius: 8px;
+      border: none;
+      outline: none;
     }
 
     button {
-      padding: 8px;
-      margin-left: 5px;
+      padding: 10px;
+      border-radius: 8px;
+      border: none;
       cursor: pointer;
+      background: #ff7a18;
+      color: white;
+      font-weight: bold;
     }
 
     ul {
       list-style: none;
       padding: 0;
       margin-top: 15px;
+      max-height: 200px;
+      overflow-y: auto;
     }
 
     li {
@@ -47,48 +60,68 @@
       align-items: center;
       justify-content: space-between;
       margin-bottom: 8px;
-      background: #eee;
-      padding: 8px;
-      border-radius: 5px;
+      background: rgba(255,255,255,0.2);
+      padding: 10px;
+      border-radius: 8px;
     }
 
     .dog-container {
-      margin-top: 30px;
+      margin-top: 40px;
+      width: 80%;
       text-align: center;
     }
 
     .dog {
-      height: 40px;
-      background: brown;
-      border-radius: 20px;
+      height: 60px;
+      background: #8b4513;
+      border-radius: 30px;
       position: relative;
       transition: width 0.5s ease;
+      margin: 0 auto;
     }
 
+    /* Head */
     .dog::before {
       content: '';
       position: absolute;
-      left: -25px;
+      left: -60px;
       top: 5px;
-      width: 30px;
-      height: 30px;
-      background: brown;
+      width: 60px;
+      height: 50px;
+      background: #8b4513;
       border-radius: 50%;
     }
 
+    /* Tail */
     .dog::after {
       content: '';
       position: absolute;
-      right: -10px;
-      top: 15px;
-      width: 10px;
-      height: 10px;
-      background: brown;
+      right: -15px;
+      top: 20px;
+      width: 15px;
+      height: 15px;
+      background: #8b4513;
       border-radius: 50%;
     }
 
+    /* Eyes */
+    .eye {
+      position: absolute;
+      width: 8px;
+      height: 8px;
+      background: black;
+      border-radius: 50%;
+      top: 20px;
+      left: -35px;
+    }
+
+    .eye.right {
+      left: -20px;
+    }
+
     .percentage {
-      margin-top: 10px;
+      margin-top: 15px;
+      font-size: 18px;
       font-weight: bold;
     }
   </style>
@@ -105,7 +138,10 @@
   </div>
 
   <div class="dog-container">
-    <div id="dog" class="dog" style="width: 20px;"></div>
+    <div id="dog" class="dog" style="width: 50px;">
+      <div class="eye"></div>
+      <div class="eye right"></div>
+    </div>
     <div id="percentage" class="percentage">0% Complete</div>
   </div>
 
@@ -130,7 +166,7 @@
       span.textContent = taskText;
 
       const deleteBtn = document.createElement('button');
-      deleteBtn.textContent = 'X';
+      deleteBtn.textContent = '✕';
       deleteBtn.onclick = () => {
         li.remove();
         updateProgress();
@@ -143,7 +179,6 @@
       taskList.appendChild(li);
 
       input.value = '';
-
       updateProgress();
     }
 
@@ -152,7 +187,7 @@
       const total = tasks.length;
 
       if (total === 0) {
-        dog.style.width = '20px';
+        dog.style.width = '50px';
         percentageText.textContent = '0% Complete';
         return;
       }
@@ -160,15 +195,12 @@
       let completed = 0;
 
       tasks.forEach(task => {
-        if (task.querySelector('input').checked) {
-          completed++;
-        }
+        if (task.querySelector('input').checked) completed++;
       });
 
       const percent = Math.round((completed / total) * 100);
 
-      // Dog grows from 20px to 300px
-      const width = 20 + (percent / 100) * 280;
+      const width = 50 + (percent / 100) * 500;
       dog.style.width = width + 'px';
 
       percentageText.textContent = percent + '% Complete';
