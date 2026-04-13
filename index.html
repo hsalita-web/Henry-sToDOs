@@ -21,24 +21,12 @@
         }
 
         h1 { margin-top: 0; color: #ffcc00; font-size: 42px; text-shadow: 3px 3px 0px #8B4513; }
-        
         .input-group { margin: 15px 0; text-align: left; }
         label { display: block; margin-bottom: 5px; font-size: 11px; font-weight: bold; text-transform: uppercase; opacity: 0.7; }
-        
-        input[type="text"] {
-            width: 100%; padding: 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.2); 
-            background: #0f172a; color: white; font-size: 16px; box-sizing: border-box; outline: none;
-        }
-
+        input[type="text"] { width: 100%; padding: 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.2); background: #0f172a; color: white; font-size: 16px; box-sizing: border-box; outline: none; }
         input[type="color"] { width: 100%; height: 40px; border: none; border-radius: 10px; background: none; cursor: pointer; }
-
-        button {
-            width: 100%; padding: 16px; border-radius: 10px; border: none;
-            background: #ffcc00; color: #0f172a; font-weight: 800; font-size: 18px;
-            cursor: pointer; transition: 0.2s;
-        }
+        button { width: 100%; padding: 16px; border-radius: 10px; border: none; background: #ffcc00; color: #0f172a; font-weight: 800; font-size: 18px; cursor: pointer; transition: 0.2s; }
         button:hover { background: #ffe066; transform: scale(1.02); }
-
         #stats-summary { display: none; margin-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 15px; }
     </style>
 </head>
@@ -71,9 +59,9 @@ const ctx = canvas.getContext('2d');
 function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
 window.addEventListener('resize', resize); resize();
 
-const WORLD_SIZE = 4000; // Map made bigger
-const FOOD_COUNT = 600;
-const BOT_COUNT = 20;
+const WORLD_SIZE = 5000; // Even bigger map
+const FOOD_COUNT = 500; // Spread thinner
+const BOT_COUNT = 22;
 const FUNNY_NAMES = ["Bark_Twain", "Oscar_Mayer", "Frank_Furter", "Sausage_Slayer", "Glizzy_God", "Mustard_Mane", "Wiener_Winner", "Link_Lover", "Bun_Burner", "Sub_Woofer"];
 
 let player, bots=[], foods=[], gameActive = false, kills = 0, mouseAngle = 0;
@@ -99,7 +87,7 @@ class Dog {
         for(let i=0; i<15; i++) this.segments.push({x:x, y:y});
     }
 
-    width() { return 12 + this.length * 0.01; }
+    width() { return 12 + this.length * 0.008; }
 
     update(allDogs) {
         let speed = 5.2; 
@@ -107,45 +95,53 @@ class Dog {
 
         if (this.isPlayer) {
             this.angle = mouseAngle;
-            if (playerBoosting && this.length > 25) { 
-                speed = 8.5; 
-                this.isBoosting = true; 
-            }
+            if (playerBoosting && this.length > 30) { speed = 8.5; this.isBoosting = true; }
         } else {
-            // "MIDDLE GROUND" AI: Aggressive but Killable
+            let avoidX = 0, avoidY = 0, danger = false;
             let distToPlayer = Math.hypot(this.x - player.x, this.y - player.y);
-            
-            // Attacking logic (Aggression)
-            if (distToPlayer < 400) {
-                // Aim slightly ahead of player to try and cut them off
-                let targetX = player.x + Math.cos(player.angle) * 100;
-                let targetY = player.y + Math.sin(player.angle) * 100;
+
+            // Improved AI: Better avoidance but still aggressive
+            let senseDist = 200; 
+            for(let d of allDogs) {
+                if (d === this) continue;
+                for(let i=0; i<d.segments.length; i+=10) {
+                    let s = d.segments[i];
+                    let dx = this.x - s.x;
+                    let dy = this.y - s.y;
+                    let distSq = dx*dx + dy*dy;
+                    if (distSq < senseDist * senseDist) {
+                        avoidX += dx * 2; avoidY += dy * 2;
+                        danger = true;
+                    }
+                }
+            }
+
+            if (danger) {
+                let escapeAngle = Math.atan2(avoidY, avoidX);
+                let diff = escapeAngle - this.angle;
+                while (diff < -Math.PI) diff += Math.PI * 2;
+                while (diff > Math.PI) diff -= Math.PI * 2;
+                this.angle += diff * 0.12; // Snappier avoidance
+            } else if (distToPlayer < 600) {
+                let targetX = player.x + Math.cos(player.angle) * 120;
+                let targetY = player.y + Math.sin(player.angle) * 120;
                 let attackAngle = Math.atan2(targetY - this.y, targetX - this.x);
-                
-                // Slow turning makes them "oversteer" so you can trap them
                 let diff = attackAngle - this.angle;
                 while (diff < -Math.PI) diff += Math.PI * 2;
                 while (diff > Math.PI) diff -= Math.PI * 2;
-                this.angle += diff * 0.06; 
-                
-                if (distToPlayer < 200 && this.length > 50) {
-                    speed = 7.5; this.isBoosting = true;
-                }
+                this.angle += diff * 0.06;
             } else {
-                // Random roaming
-                this.angle += (Math.random() - 0.5) * 0.15;
+                this.angle += (Math.random() - 0.5) * 0.1;
             }
 
-            // Minimal defense (Just enough to not hit walls immediately)
-            const margin = 80;
-            if(this.x < margin || this.x > WORLD_SIZE-margin || this.y < margin || this.y > WORLD_SIZE-margin) {
-                this.angle += 0.2; 
-            }
+            const margin = 120;
+            if(this.x < margin) this.angle = 0; else if(this.x > WORLD_SIZE-margin) this.angle = Math.PI;
+            if(this.y < margin) this.angle = Math.PI/2; else if(this.y > WORLD_SIZE-margin) this.angle = -Math.PI/2;
         }
 
         if (this.isBoosting) {
-            this.length -= 0.18;
-            if (Math.random() > 0.8) foods.push(new Food(this.segments[this.segments.length-1].x, this.segments[this.segments.length-1].y, 3, 0.8, true));
+            this.length -= 0.12;
+            if (Math.random() > 0.85) foods.push(new Food(this.segments[this.segments.length-1].x, this.segments[this.segments.length-1].y, 3, 0.8, true));
         }
 
         this.x += Math.cos(this.angle) * speed;
@@ -169,12 +165,21 @@ class Dog {
         ctx.save();
         ctx.translate(hx, hy);
         ctx.rotate(this.angle);
+        
+        // Collar (Just behind the head)
+        ctx.fillStyle = "#ff4444"; // Red collar
+        ctx.fillRect(-w*0.2, -w*0.5, w*0.3, w);
+        ctx.fillStyle = "#ffd700"; // Gold tag
+        ctx.beginPath(); ctx.arc(0, w*0.4, w*0.15, 0, Math.PI*2); ctx.fill();
+
         ctx.fillStyle = this.color;
         ctx.beginPath(); ctx.ellipse(w*0.5, 0, w*0.75, w*0.48, 0, 0, Math.PI*2); ctx.fill();
         ctx.beginPath(); ctx.ellipse(-2, -w*0.6, w*0.55, w*0.35, Math.PI/3, 0, Math.PI*2); ctx.fill();
         ctx.beginPath(); ctx.ellipse(-2, w*0.6, w*0.55, w*0.35, -Math.PI/3, 0, Math.PI*2); ctx.fill();
+        
         ctx.fillStyle = "#111";
         ctx.beginPath(); ctx.arc(w*1.2, 0, w*0.18, 0, Math.PI*2); ctx.fill();
+        
         const eyeRadius = 5.5; const pupilRadius = 2.5;
         const eyeLat = w * 0.35; const eyeLong = w * 0.3; 
         ctx.fillStyle = "white";
@@ -186,7 +191,7 @@ class Dog {
         ctx.restore();
 
         ctx.fillStyle = "white"; ctx.font = "bold 13px sans-serif"; ctx.textAlign = "center";
-        ctx.fillText(this.name, hx, hy - w - 12);
+        ctx.fillText(this.name, hx, hy - w - 15);
     }
 }
 
@@ -194,6 +199,7 @@ class Food {
     constructor(x, y, size=4, val=2, drop=false) {
         this.x=x; this.y=y; this.size=size; this.val=val; this.drop=drop;
         this.color = drop ? "#ffcc00" : `hsl(${Math.random()*360},80%,70%)`;
+        this.life = 600; // Dropped food eventually fades
     }
     draw(camera) {
         ctx.fillStyle = this.color;
@@ -207,8 +213,7 @@ for(let i=0; i<BOT_COUNT; i++) spawnBot();
 
 function spawnBot() {
     let colors = ['#e67e22', '#e74c3c', '#9b59b6', '#3498db', '#2ecc71', '#f1c40f'];
-    // Bots spawn with random sizes up to 1500
-    let randSize = 40 + Math.random() * 1460;
+    let randSize = 40 + Math.random() * 1000;
     bots.push(new Dog(Math.random()*WORLD_SIZE, Math.random()*WORLD_SIZE, colors[Math.floor(Math.random()*colors.length)], FUNNY_NAMES[Math.floor(Math.random()*FUNNY_NAMES.length)], false, randSize));
 }
 
@@ -225,34 +230,34 @@ function checkCollision(dog, others) {
             if (i < 12 && o === dog) continue; 
             let s = o.segments[i];
             let dx = dog.x - s.x, dy = dog.y - s.y;
-            if (dx*dx + dy*dy < (o.width()/2 + 5)**2) return true;
+            if (dx*dx + dy*dy < (o.width()/2 + 6)**2) return true;
         }
     }
     return false;
 }
 
 function loop() {
-    ctx.fillStyle = '#0f172a'; 
-    ctx.fillRect(0,0,canvas.width,canvas.height);
+    ctx.fillStyle = '#0f172a'; ctx.fillRect(0,0,canvas.width,canvas.height);
     let camera = { x: player.x - canvas.width/2, y: player.y - canvas.height/2 };
-    ctx.strokeStyle = '#334155'; ctx.lineWidth = 45; 
+    ctx.strokeStyle = '#334155'; ctx.lineWidth = 55; 
     ctx.strokeRect(-camera.x, -camera.y, WORLD_SIZE, WORLD_SIZE);
 
     let all = [player, ...bots];
     player.update(all);
     bots.forEach(b => b.update(all));
 
-    all.forEach(d => {
-        for (let i = foods.length-1; i>=0; i--) {
-            let f = foods[i];
+    for (let i = foods.length-1; i>=0; i--) {
+        let f = foods[i];
+        if (f.drop) { f.life--; if(f.life <= 0) foods.splice(i,1); }
+        all.forEach(d => {
             let dx = d.x - f.x, dy = d.y - f.y;
             if (dx*dx + dy*dy < (d.width()+12)**2) {
                 d.length += f.val;
                 if (f.drop) foods.splice(i,1);
                 else { f.x = Math.random()*WORLD_SIZE; f.y = Math.random()*WORLD_SIZE; }
             }
-        }
-    });
+        });
+    }
 
     if (gameActive) {
         if (player.x<0 || player.x>WORLD_SIZE || player.y<0 || player.y>WORLD_SIZE || checkCollision(player, bots)) {
@@ -264,8 +269,8 @@ function loop() {
         }
         for (let i = bots.length-1; i>=0; i--) {
             if (bots[i].x<0 || bots[i].x>WORLD_SIZE || bots[i].y<0 || bots[i].y>WORLD_SIZE || checkCollision(bots[i], [player, ...bots.filter((_,j)=>j!==i)])) {
-                if (Math.hypot(bots[i].x-player.x, bots[i].y-player.y) < 400) kills++;
-                for(let j=0; j<bots[i].segments.length; j+=5) foods.push(new Food(bots[i].segments[j].x, bots[i].segments[j].y, 6, 3, true));
+                if (Math.hypot(bots[i].x-player.x, bots[i].y-player.y) < 500) kills++;
+                for(let j=0; j<bots[i].segments.length; j+=8) foods.push(new Food(bots[i].segments[j].x, bots[i].segments[j].y, 6, 4, true));
                 bots.splice(i,1); spawnBot();
             }
         }
@@ -276,30 +281,22 @@ function loop() {
     if (gameActive) player.draw(camera);
 
     if (gameActive) {
-        // LEADER BOARD TITLE + 8 SLOTS
-        ctx.fillStyle = "rgba(0,0,0,0.5)";
-        ctx.fillRect(canvas.width - 200, 20, 180, 230);
+        ctx.fillStyle = "rgba(0,0,0,0.5)"; ctx.fillRect(canvas.width - 200, 20, 180, 230);
         ctx.fillStyle = "#ffcc00"; ctx.font = "bold 16px sans-serif"; ctx.textAlign = "center";
         ctx.fillText("LEADER BOARD", canvas.width - 110, 45);
-        
         let lb = [player, ...bots].sort((a,b) => b.length - a.length).slice(0, 8);
         ctx.font = "14px sans-serif"; ctx.textAlign = "left";
         lb.forEach((d, i) => {
             ctx.fillStyle = (d === player) ? "#ffcc00" : "white";
             ctx.fillText(`${i+1}. ${d.name.substring(0,10)}`, canvas.width - 190, 75 + i*20);
-            ctx.textAlign = "right";
-            ctx.fillText(Math.floor(d.length), canvas.width - 35, 75 + i*20);
+            ctx.textAlign = "right"; ctx.fillText(Math.floor(d.length), canvas.width - 35, 75 + i*20);
             ctx.textAlign = "left";
         });
-
-        // MINIMAP WITH GREY BORDER
         const ms = 150, mx = canvas.width - 175, my = canvas.height - 175;
-        ctx.strokeStyle = "#94a3b8"; ctx.lineWidth = 3;
-        ctx.strokeRect(mx-2, my-2, ms+4, ms+4);
+        ctx.strokeStyle = "#94a3b8"; ctx.lineWidth = 3; ctx.strokeRect(mx-2, my-2, ms+4, ms+4);
         ctx.fillStyle = "rgba(0,0,0,0.6)"; ctx.fillRect(mx, my, ms, ms);
         bots.forEach(b => { ctx.fillStyle = "rgba(255,255,255,0.4)"; ctx.fillRect(mx + (b.x/WORLD_SIZE)*ms, my + (b.y/WORLD_SIZE)*ms, 2, 2); });
         ctx.fillStyle = "#ffcc00"; ctx.beginPath(); ctx.arc(mx+(player.x/WORLD_SIZE)*ms, my+(player.y/WORLD_SIZE)*ms, 3.5, 0, Math.PI*2); ctx.fill();
-        
         ctx.fillStyle = "white"; ctx.font = "bold 20px sans-serif";
         ctx.fillText(`Kills: ${kills} | Length: ${Math.floor(player.length)}`, 25, canvas.height - 30);
     }
