@@ -121,19 +121,20 @@ class Dog {
                 while (diff > Math.PI) diff -= Math.PI * 2;
                 this.angle += diff * 0.03; 
             } else {
-                // 2. SCAVENGER LOGIC (Updated to ignore self-food)
-                let bestFood = null;
-                let minDist = 450; 
-                for(let f of allFoods) {
-                    if(f.drop) {
-                        let d = Math.hypot(this.x - f.x, this.y - f.y);
-                        // If it's too close (likely their own tail), they ignore it
-                        if(d < minDist && d > 60) { 
-                            minDist = d; 
-                            bestFood = f; 
-                        }
-                    }
-                }
+         // 2. SCAVENGER LOGIC (Improved Anti-Self-Circle)
+let bestFood = null;
+let minDist = 450; 
+for(let f of allFoods) {
+    if(f.drop) {
+        let d = Math.hypot(this.x - f.x, this.y - f.y);
+        // BOTS WILL NOW IGNORE ANY DROP WITHIN 100 PIXELS
+        // This prevents them from "death-spiraling" their own tail
+        if(d < minDist && d > 100) { 
+            minDist = d; 
+            bestFood = f; 
+        }
+    }
+}
 
                 if(bestFood) {
                     let foodAngle = Math.atan2(bestFood.y - this.y, bestFood.x - this.x);
