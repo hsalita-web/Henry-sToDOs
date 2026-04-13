@@ -109,31 +109,47 @@ class Dog {
         this.name = name;
         this.isPlayer = isPlayer;
         this.isBoosting = false;
-        // Start with enough segments to look like a dog
         for(let i=0; i<15; i++) this.segments.push({x:x, y:y});
     }
 
     width() { return 12 + this.length * 0.01; }
 
     update(allDogs) {
-        let speed = 3.5; // Faster base speed
+        // Base speed increased 1.5x from previous (approx 5.25)
+        let speed = 5.2; 
         this.isBoosting = false;
 
         if (this.isPlayer) {
             this.angle = mouseAngle;
             if (playerBoosting && this.length > 20) { 
-                speed = 6.2; 
+                speed = 8.5; 
                 this.isBoosting = true; 
             }
         } else {
             // AI Logic
+            let targetAngle = this.angle;
             let avoidX = 0, avoidY = 0, danger = false;
-            const margin = 120;
+            
+            // Wall avoidance
+            const margin = 150;
             if(this.x < margin) avoidX += 1; else if(this.x > WORLD_SIZE-margin) avoidX -= 1;
             if(this.y < margin) avoidY += 1; else if(this.y > WORLD_SIZE-margin) avoidY -= 1;
 
-            let senseDist = diffSetting === 'easy' ? 80 : (diffSetting === 'hard' ? 160 : 250);
+            let senseDist = diffSetting === 'easy' ? 100 : (diffSetting === 'hard' ? 180 : 280);
             
+            // Find closest target or threat
+            let closestPlayer = player; 
+            let distToPlayer = Math.hypot(this.x - player.x, this.y - player.y);
+
+            // AGGRESSIVE AI: If difficult, they try to head-off the player
+            if (diffSetting === 'difficult' && distToPlayer < 500) {
+                // Aim slightly ahead of player to "cut them off"
+                let leadX = player.x + Math.cos(player.angle) * 100;
+                let leadY = player.y + Math.sin(player.angle) * 100;
+                targetAngle = Math.atan2(leadY - this.y, leadX - this.x);
+                if (distToPlayer < 200) { speed = 7.5; this.isBoosting = true; }
+            }
+
             for(let d of allDogs) {
                 if (d === this) continue;
                 let dx = this.x - d.x;
@@ -146,15 +162,22 @@ class Dog {
             }
 
             if (danger || avoidX !== 0 || avoidY !== 0) {
-                let targetAngle = Math.atan2(avoidY, avoidX);
+                let escapeAngle = Math.atan2(avoidY, avoidX);
+                let diff = escapeAngle - this.angle;
+                while (diff < -Math.PI) diff += Math.PI * 2;
+                while (diff > Math.PI) diff -= Math.PI * 2;
+                
+                // Bots have slightly lower turn speed than player so you can kill them
+                let turnSpeed = diffSetting === 'easy' ? 0.08 : (diffSetting === 'hard' ? 0.14 : 0.18);
+                this.angle += diff * turnSpeed;
+            } else if (diffSetting === 'difficult') {
+                // Smoothly steer towards the target angle if no danger
                 let diff = targetAngle - this.angle;
                 while (diff < -Math.PI) diff += Math.PI * 2;
                 while (diff > Math.PI) diff -= Math.PI * 2;
-                let turnSpeed = diffSetting === 'easy' ? 0.08 : (diffSetting === 'hard' ? 0.18 : 0.25);
-                this.angle += diff * turnSpeed;
-                if(danger && diffSetting !== 'easy' && this.length > 30) { speed = 5.8; this.isBoosting = true; }
+                this.angle += diff * 0.1;
             } else {
-                this.angle += (Math.random() - 0.5) * 0.12;
+                this.angle += (Math.random() - 0.5) * 0.15;
             }
         }
 
@@ -186,10 +209,10 @@ class Dog {
         ctx.rotate(this.angle);
         ctx.fillStyle = this.color;
         
-        // Head/Snout
+        // Head
         ctx.beginPath(); ctx.ellipse(w*0.5, 0, w*0.75, w*0.48, 0, 0, Math.PI*2); ctx.fill();
         
-        // Ears (Floppy)
+        // Floppy Ears
         ctx.beginPath(); ctx.ellipse(-2, -w*0.6, w*0.55, w*0.35, Math.PI/3, 0, Math.PI*2); ctx.fill();
         ctx.beginPath(); ctx.ellipse(-2, w*0.6, w*0.55, w*0.35, -Math.PI/3, 0, Math.PI*2); ctx.fill();
         
@@ -197,21 +220,19 @@ class Dog {
         ctx.fillStyle = "#111";
         ctx.beginPath(); ctx.arc(w*1.2, 0, w*0.18, 0, Math.PI*2); ctx.fill();
         
-        // THE EYES: Consistent White circles + Small pupils
-        const eyeRadius = 5; 
-        const pupilRadius = 2.2;
-        const eyeOffsetSide = w * 0.35;
-        const eyeOffsetFront = w * 0.3;
+        // PERFECT EYES: Consistent white circles + small black pupils
+        const eyeRadius = 5.5; 
+        const pupilRadius = 2.5;
+        const eyeLat = w * 0.35; // Lateral offset
+        const eyeLong = w * 0.3; // Longitudinal offset
 
-        // Whites
         ctx.fillStyle = "white";
-        ctx.beginPath(); ctx.arc(eyeOffsetFront, -eyeOffsetSide, eyeRadius, 0, Math.PI*2); ctx.fill();
-        ctx.beginPath(); ctx.arc(eyeOffsetFront, eyeOffsetSide, eyeRadius, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(eyeLong, -eyeLat, eyeRadius, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(eyeLong, eyeLat, eyeRadius, 0, Math.PI*2); ctx.fill();
         
-        // Pupils
         ctx.fillStyle = "black";
-        ctx.beginPath(); ctx.arc(eyeOffsetFront + 1, -eyeOffsetSide, pupilRadius, 0, Math.PI*2); ctx.fill();
-        ctx.beginPath(); ctx.arc(eyeOffsetFront + 1, eyeOffsetSide, pupilRadius, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(eyeLong + 1, -eyeLat, pupilRadius, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(eyeLong + 1, eyeLat, pupilRadius, 0, Math.PI*2); ctx.fill();
         
         ctx.restore();
 
@@ -250,10 +271,10 @@ function startGame() {
 function checkCollision(dog, others) {
     for (let o of others) {
         for (let i=0; i<o.segments.length; i++) {
-            if (i < 12 && o === dog) continue; // Don't hit your own head
+            if (i < 10 && o === dog) continue; 
             let s = o.segments[i];
             let dx = dog.x - s.x, dy = dog.y - s.y;
-            if (dx*dx + dy*dy < (o.width()/2 + 4)**2) return true;
+            if (dx*dx + dy*dy < (o.width()/2 + 4.5)**2) return true;
         }
     }
     return false;
@@ -263,9 +284,8 @@ function loop() {
     ctx.fillStyle = '#0f172a'; ctx.fillRect(0,0,canvas.width,canvas.height);
     let camera = { x: player.x - canvas.width/2, y: player.y - canvas.height/2 };
     
-    // Grid Pattern for sense of speed
+    // Grid
     ctx.strokeStyle = "rgba(255,255,255,0.03)";
-    ctx.lineWidth = 1;
     for(let i=0; i<WORLD_SIZE; i+=100) {
         ctx.beginPath(); ctx.moveTo(i-camera.x, -camera.y); ctx.lineTo(i-camera.x, WORLD_SIZE-camera.y); ctx.stroke();
         ctx.beginPath(); ctx.moveTo(-camera.x, i-camera.y); ctx.lineTo(WORLD_SIZE-camera.x, i-camera.y); ctx.stroke();
@@ -281,7 +301,7 @@ function loop() {
         for (let i = foods.length-1; i>=0; i--) {
             let f = foods[i];
             let dx = d.x - f.x, dy = d.y - f.y;
-            if (dx*dx + dy*dy < (d.width()+8)**2) {
+            if (dx*dx + dy*dy < (d.width()+10)**2) {
                 d.length += f.val;
                 if (f.drop) foods.splice(i,1);
                 else { f.x = Math.random()*WORLD_SIZE; f.y = Math.random()*WORLD_SIZE; }
@@ -299,7 +319,7 @@ function loop() {
         }
         for (let i = bots.length-1; i>=0; i--) {
             if (bots[i].x<0 || bots[i].x>WORLD_SIZE || bots[i].y<0 || bots[i].y>WORLD_SIZE || checkCollision(bots[i], [player, ...bots.filter((_,j)=>j!==i)])) {
-                if (Math.hypot(bots[i].x-player.x, bots[i].y-player.y) < 300) kills++;
+                if (Math.hypot(bots[i].x-player.x, bots[i].y-player.y) < 350) kills++;
                 for(let j=0; j<bots[i].segments.length; j+=4) foods.push(new Food(bots[i].segments[j].x, bots[i].segments[j].y, 6, 3, true));
                 bots.splice(i,1); spawnBot();
             }
@@ -311,12 +331,10 @@ function loop() {
     if (gameActive) player.draw(camera);
 
     if (gameActive) {
-        ctx.fillStyle = "white"; ctx.font = "bold 20px sans-serif"; ctx.textAlign = "left";
+        ctx.fillStyle = "white"; ctx.font = "bold 20px sans-serif";
         ctx.fillText(`Kills: ${kills} | Length: ${Math.floor(player.length)}`, 25, canvas.height - 30);
-        // Minimap
         const ms = 150, mx = canvas.width - 175, my = canvas.height - 175;
         ctx.fillStyle = "rgba(0,0,0,0.6)"; ctx.fillRect(mx, my, ms, ms);
-        ctx.strokeStyle = "rgba(255,255,255,0.1)"; ctx.strokeRect(mx,my,ms,ms);
         bots.forEach(b => { ctx.fillStyle = "rgba(255,255,255,0.4)"; ctx.fillRect(mx + (b.x/WORLD_SIZE)*ms, my + (b.y/WORLD_SIZE)*ms, 2, 2); });
         ctx.fillStyle = "#ffcc00"; ctx.beginPath(); ctx.arc(mx+(player.x/WORLD_SIZE)*ms, my+(player.y/WORLD_SIZE)*ms, 3.5, 0, Math.PI*2); ctx.fill();
     }
