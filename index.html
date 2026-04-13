@@ -90,22 +90,20 @@ class Dog {
     width() { return 12 + this.length * 0.006; }
 
     update(allDogs, allFoods) {
-        let speed = 5.2; 
+        let speed = 3.8; // Lowered from 5.2
         this.isBoosting = false;
 
         if (this.isPlayer) {
             this.angle = mouseAngle;
-            if (playerBoosting && this.length > 30) { speed = 8.5; this.isBoosting = true; }
+            if (playerBoosting && this.length > 30) { speed = 6.2; this.isBoosting = true; } // Lowered from 8.5
         } else {
             let avoidX = 0, avoidY = 0, danger = false;
             let distToPlayer = Math.hypot(this.x - player.x, this.y - player.y);
 
-            // 1. MINIMAL AVOIDANCE (They are now much dumber)
-            // They only see things 70 pixels away (very close)
-            let senseDist = 70; 
+            // 1. MINIMAL AVOIDANCE
+            let senseDist = 60; 
             for(let d of allDogs) {
                 if (d === this) continue;
-                // They only check the very head of other dogs
                 let s = d.segments[0];
                 let dx = this.x - s.x;
                 let dy = this.y - s.y;
@@ -121,11 +119,11 @@ class Dog {
                 let diff = escapeAngle - this.angle;
                 while (diff < -Math.PI) diff += Math.PI * 2;
                 while (diff > Math.PI) diff -= Math.PI * 2;
-                this.angle += diff * 0.04; // Very slow reaction turn
+                this.angle += diff * 0.03; // Even slower turn
             } else {
-                // 2. SCAVENGER LOGIC (High Priority)
+                // 2. SCAVENGER LOGIC
                 let bestFood = null;
-                let minDist = 500; 
+                let minDist = 450; 
                 for(let f of allFoods) {
                     if(f.drop) {
                         let d = Math.hypot(this.x - f.x, this.y - f.y);
@@ -138,33 +136,32 @@ class Dog {
                     let diff = foodAngle - this.angle;
                     while (diff < -Math.PI) diff += Math.PI * 2;
                     while (diff > Math.PI) diff -= Math.PI * 2;
-                    this.angle += diff * 0.2; // They snap toward food instantly
-                    speed = 8.0; 
+                    this.angle += diff * 0.12; 
+                    speed = 5.8; // Lowered scavenger speed
                     this.isBoosting = true;
                 } else if (distToPlayer < 700) {
                     // 3. AGGRESSIVE ATTACK
-                    let targetX = player.x + Math.cos(player.angle) * 80; 
-                    let targetY = player.y + Math.sin(player.angle) * 80;
+                    let targetX = player.x + Math.cos(player.angle) * 70; 
+                    let targetY = player.y + Math.sin(player.angle) * 70;
                     let attackAngle = Math.atan2(targetY - this.y, targetX - this.x);
                     let diff = attackAngle - this.angle;
                     while (diff < -Math.PI) diff += Math.PI * 2;
                     while (diff > Math.PI) diff -= Math.PI * 2;
-                    this.angle += diff * 0.09; 
-                    if(distToPlayer < 400) { speed = 7.5; this.isBoosting = true; }
+                    this.angle += diff * 0.07; 
+                    if(distToPlayer < 350) { speed = 5.5; this.isBoosting = true; }
                 } else {
-                    this.angle += (Math.random() - 0.5) * 0.1;
+                    this.angle += (Math.random() - 0.5) * 0.08;
                 }
             }
 
-            // Boundary checks
             const margin = 80;
             if(this.x < margin || this.x > WORLD_SIZE-margin || this.y < margin || this.y > WORLD_SIZE-margin) {
-                this.angle += 0.2;
+                this.angle += 0.15;
             }
         }
 
         if (this.isBoosting) {
-            this.length -= 0.1; 
+            this.length -= 0.08; 
             if (Math.random() > 0.9) foods.push(new Food(this.segments[this.segments.length-1].x, this.segments[this.segments.length-1].y, 3, 0.5, true));
         }
 
@@ -274,14 +271,12 @@ function loop() {
         let f = foods[i];
         if (f.drop) { f.life--; if(f.life <= 0) { foods.splice(i,1); continue; } }
         
-        let eaten = false;
         for(let d of all) {
             let dx = d.x - f.x, dy = d.y - f.y;
             if (dx*dx + dy*dy < (d.width()+12)**2) {
                 d.length += (f.val * 0.6); 
                 if (f.drop) foods.splice(i,1);
                 else { f.x = Math.random()*WORLD_SIZE; f.y = Math.random()*WORLD_SIZE; }
-                eaten = true;
                 break;
             }
         }
